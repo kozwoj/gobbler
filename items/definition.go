@@ -285,14 +285,40 @@ func CheckDateTime(dateTime string) error {
 }
 
 /*
-TimeSpan should be a non empty string, which is represents time.Duration in Go
-e.g. "2.5h", "3m", "4s", "5ms", "1h10m10s". !! Go does not support days as time unit.
+TimeSpan should be a non empty string representing a duration. Supports Go duration units (h, m, s, ms, us, ns)
+plus Kusto-style days prefix, e.g. "7d", "1d12h30m", "2.5h", "3m", "4s".
 */
 func CheckTimeSpan(timeSpan string) error {
 	if timeSpan == "" {
 		return NewValidationError("timespan", "timeSpan", timeSpan, ErrEmptyTimespan)
 	}
-	_, err := time.ParseDuration(timeSpan)
+	// strip a leading days component of the form Nd or N.Fd (e.g. "7d", "1d12h", "0.5d")
+	remainder := timeSpan
+	i := 0
+	for i < len(remainder) && (remainder[i] >= '0' && remainder[i] <= '9' || remainder[i] == '.') {
+		i++
+	}
+	if i > 0 && i < len(remainder) && remainder[i] == 'd' {
+		// validate the numeric part is a valid number
+		dayStr := remainder[:i]
+		hasDigit := false
+		for _, c := range dayStr {
+			if c >= '0' && c <= '9' {
+				hasDigit = true
+				break
+			}
+		}
+		if !hasDigit {
+			return NewValidationError("timespan", "timeSpan", timeSpan, fmt.Errorf("%w: invalid days value", ErrInvalidTimespan))
+		}
+		remainder = remainder[i+1:] // strip the Nd prefix
+	}
+	// if nothing remains after stripping days, it's valid (e.g. "7d")
+	if remainder == "" {
+		return nil
+	}
+	// validate the rest with Go's standard duration parser
+	_, err := time.ParseDuration(remainder)
 	if err != nil {
 		return NewValidationError("timespan", "timeSpan", timeSpan, fmt.Errorf("%w: %v", ErrInvalidTimespan, err))
 	}

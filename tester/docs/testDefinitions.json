@@ -22,7 +22,7 @@
     {   
         "name": "beta",
         "documentation": "test definition beta with string, bool and real types",
-        "folder": "",
+        "folder": "bettaFolder",
         "latencyMinutes": 2,
         "orderedColumns": [
             {

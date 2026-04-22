@@ -3,20 +3,20 @@
 		{"allscalars": {"_string": "Hyundai", "_boolean": true, "_datetime": "2023-10-01 12:00:00", "_dynamic": "{\"color\":\"Crimson\",\"size\":\"small\"}", "_int": 0, "_real": 12537.5948, "_timespan": "7d"}},
 		{"vmShutdown": {"vmId": "vm_87345882", "shutdownStart": "2023-10-01 12:00:00.125", "shutdownReason": "OS update"}},
 		{"vmReboot": {"vmId": "vm_87345882", "eventTime": "2023-10-01 12:00:00.125", "rebootStart": "2023-10-01 11:00:00", "rebootDurationSec": "120s", "rebootReason": "OS update", "OS": "{\"os\": \"Windows\", \"version\": \"11\"}"}},
-		{"somescalars": { "_string": "Hyundaiii", "_boolean": true, "_datetime": "2018-05-01T01:40:42.902Z", "_int": 0, "_real": 12537.5948 }}
+		{"somescalars": { "_string": "Hyundaiii", "_boolean": true, "_datetime": "2018-05-01 01:40:42.902", "_int": 0, "_real": 12537.5948 }}
 	],
 	
 	[
-		{"allscalars": {"_string": "Hyundaiii", "_boolean": true, "_datetime": "2018-05-01T01:40:42.902Z", "_dynamic": "{\"color\":\"Crimson\",\"size\":\"small\"}", "_int": 0, "_real": 12537.5948, "_timespan": "7d"}},
-		{"allscalars": {"_string": "Plymouth", "_boolean": true, "_datetime": "2018-05-01T01:40:43.414Z", "_dynamic": "{\"color\":\"Purple\",\"size\":\"mediem\"}", "_int": 1, "_real": 35280.1204, "_timespan": "8s"}},
-		{"allscalars": {"_string": "Mercury", "_boolean": true, "_datetime": "2018-05-01T01:40:43.919Z", "_dynamic": "{\"color\":\"Pink\",\"size\":\"ex-large\"}", "_int": 4, "_real": 47188.7112, "_timespan": "9s"}},
-		{"allscalars": {"_string": "Subaru", "_boolean": false, "_datetime": "2018-05-01T01:40:44.424Z", "_dynamic": "{\"color\":\"Blue\",\"size\":\"large\"}", "_int": 4, "_real": 29606.8954, "_timespan": "3d"}}
+		{"allscalars": {"_string": "Hyundaiii", "_boolean": true, "_datetime": "2018-05-01 01:40:42.902", "_dynamic": "{\"color\":\"Crimson\",\"size\":\"small\"}", "_int": 0, "_real": 12537.5948, "_timespan": "7d"}},
+		{"allscalars": {"_string": "Plymouth", "_boolean": true, "_datetime": "2018-05-01 01:40:43.414", "_dynamic": "{\"color\":\"Purple\",\"size\":\"mediem\"}", "_int": 1, "_real": 35280.1204, "_timespan": "8s"}},
+		{"allscalars": {"_string": "Mercury", "_boolean": true, "_datetime": "2018-05-01 01:40:43.919", "_dynamic": "{\"color\":\"Pink\",\"size\":\"ex-large\"}", "_int": 4, "_real": 47188.7112, "_timespan": "9s"}},
+		{"allscalars": {"_string": "Subaru", "_boolean": false, "_datetime": "2018-05-01 01:40:44.424", "_dynamic": "{\"color\":\"Blue\",\"size\":\"large\"}", "_int": 4, "_real": 29606.8954, "_timespan": "3d"}}
 	],
 
 	[
-    	{ "somescalars": { "_string": "Hyundaiii", "_boolean": true, "_datetime": "2018-05-01T01:40:42.902Z", "_int": 0, "_real": 12537.5948 } },
-    	{ "somescalars": { "_string": "Plymouth", "_boolean": true, "_datetime": "2018-05-01T01:40:43.414Z", "_int": 1, "_real": 35280.1204 } },
-    	{ "somescalars": { "_string": "Mercury", "_boolean": true, "_datetime": "2018-05-01T01:40:43.919Z", "_int": 4, "_real": 47188.7112 } },
-    	{ "somescalars": { "_string": "Subaru", "_boolean": false, "_datetime": "2018-05-01T01:40:44.424Z", "_int": 4, "_real": 29606.8954 } }
+    	{ "somescalars": { "_string": "Hyundaiii", "_boolean": true, "_datetime": "2018-05-01 01:40:42.902", "_int": 0, "_real": 12537.5948 } },
+    	{ "somescalars": { "_string": "Plymouth", "_boolean": true, "_datetime": "2018-05-01 01:40:43.414", "_int": 1, "_real": 35280.1204 } },
+    	{ "somescalars": { "_string": "Mercury", "_boolean": true, "_datetime": "2018-05-01 01:40:43.919", "_int": 4, "_real": 47188.7112 } },
+    	{ "somescalars": { "_string": "Subaru", "_boolean": false, "_datetime": "2018-05-01 01:40:44.424", "_int": 4, "_real": 29606.8954 } }
 	]
 ]
