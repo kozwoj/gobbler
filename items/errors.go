@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Items-specific errors
+/* ============================  Items-specific errors ============================ */
 var (
 	ErrInvalidDateTime          = errors.New("invalid datetime format")
 	ErrEmptyTimespan            = errors.New("timespan cannot be empty")
@@ -25,8 +25,10 @@ var (
 	ErrMissingColumnType        = errors.New("field type value missing or not a string")
 	ErrInconsistentDefaultValue = errors.New("defaultValue inconsistent with column type")
 	ErrInvalidDefaultDateTime   = errors.New("defaultValue is not correctly formed datetime")
-	ErrFolderTooShort           = errors.New("folder name must be at least 3 characters")
-	ErrDuplicateColumnName      = errors.New("duplicate column name")
+	ErrFolderTooShort            = errors.New("folder name must be at least 3 characters")
+	ErrDuplicateColumnName       = errors.New("duplicate column name")
+	ErrDefinitionAlreadyExists   = errors.New("definition with this name already exists")
+	ErrDefinitionNotFound        = errors.New("definition not found")
 )
 
 // ItemsError provides context for item definition failures
@@ -95,5 +97,74 @@ func NewColumnError(field, value string, err error) *ItemsError {
 		Field:     field,
 		Value:     value,
 		Err:       err,
+	}
+}
+
+/* ============================  Ingest-specific errors ============================ */
+var (
+	ErrInvalidInputFormat    = errors.New("invalid input format")
+	ErrEmptyInput            = errors.New("empty input provided")
+	ErrUnsupportedItemType   = errors.New("unsupported item type")
+	ErrParsingFailed         = errors.New("failed to parse input")
+	ErrItemTypeNotDefined    = errors.New("item type not defined")
+	ErrInvalidFieldType      = errors.New("invalid field type")
+	ErrMissingRequiredField  = errors.New("missing required field")
+	ErrInvalidJSON           = errors.New("invalid JSON format")
+	ErrInvalidJSONArray      = errors.New("input is not a valid JSON array")
+	ErrInvalidItemStructure  = errors.New("item does not have exactly one key")
+	ErrItemDataParsingFailed = errors.New("item data cannot be parsed as JSON object")
+)
+
+// IngestError provides context for ingestion failures
+
+type IngestError struct {
+	Op       string // "parse", "validate", "convert"
+	Input    string // truncated input for debugging
+	ItemType string // type being processed
+	Err      error  // underlying error
+}
+
+func (e *IngestError) Error() string {
+	input := e.Input
+	if len(input) > 50 {
+		input = input[:47] + "..."
+	}
+	return fmt.Sprintf("ingest %s failed for item type '%s' with input '%s': %v",
+		e.Op, e.ItemType, input, e.Err)
+}
+
+func (e *IngestError) Unwrap() error {
+	return e.Err
+}
+
+/*
+Helper functions
+*/
+
+func NewConvertError(itemType, input string, err error) *IngestError {
+	return &IngestError{
+		Op:       "convert",
+		Input:    input,
+		ItemType: itemType,
+		Err:      err,
+	}
+}
+
+func NewFieldError(fieldName, itemType, fieldValue string, err error) *IngestError {
+	return &IngestError{
+		Op:       "validate_field",
+		Input:    fmt.Sprintf("field:%s value:%s", fieldName, fieldValue),
+		ItemType: itemType,
+		Err:      err,
+	}
+}
+
+// Helper to create input splitting errors
+func NewSplitError(itemIndex int, input string, err error) *IngestError {
+	return &IngestError{
+		Op:       "split",
+		Input:    input,
+		ItemType: fmt.Sprintf("item_%d", itemIndex),
+		Err:      err,
 	}
 }
