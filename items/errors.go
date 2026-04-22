@@ -25,6 +25,8 @@ var (
 	ErrMissingColumnType        = errors.New("field type value missing or not a string")
 	ErrInconsistentDefaultValue = errors.New("defaultValue inconsistent with column type")
 	ErrInvalidDefaultDateTime   = errors.New("defaultValue is not correctly formed datetime")
+	ErrFolderTooShort           = errors.New("folder name must be at least 3 characters")
+	ErrDuplicateColumnName      = errors.New("duplicate column name")
 )
 
 // ItemsError provides context for item definition failures

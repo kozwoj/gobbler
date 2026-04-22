@@ -93,8 +93,11 @@ func CreateItemDefinition(def string, itemDef *ItemDefinition) error {
 	}
 	// check if definition contains optional folder field of type string, and if it is missing set it to the value of the name field
 	if folder, ok := m["folder"].(string); ok {
-		// check if the folder is a valid file name
+		// check if the folder is a valid file name and meets the minimum length of 3
 		if err := CheckFileName(folder); err == nil {
+			if len(folder) < 3 {
+				return NewDefinitionError("folder", folder, ErrFolderTooShort)
+			}
 			itemDef.Folder = folder
 		} else {
 			return NewDefinitionError("folder", folder, ErrInvalidFolderField)
@@ -106,11 +109,15 @@ func CreateItemDefinition(def string, itemDef *ItemDefinition) error {
 		itemDef.Folder = itemDef.TypeName
 	}
 	// check definition contains latencyMinutes field of type integer, and if it is missing set it to default value 1
-	if latency, ok := m["latencyMinutes"].(int64); ok {
-		if latency < 0 {
-			return NewDefinitionError("latencyMinutes", fmt.Sprintf("%d", latency), ErrNegativeLatency)
+	// JSON numbers unmarshal as float64, so accept float64 and verify it has no fractional part
+	if latencyRaw, ok := m["latencyMinutes"].(float64); ok {
+		if latencyRaw != float64(int(latencyRaw)) {
+			return NewDefinitionError("latencyMinutes", fmt.Sprintf("%v", latencyRaw), ErrInvalidLatency)
 		}
-		itemDef.Latency = int(latency) // set latency field of ItemDefinition
+		if latencyRaw < 0 {
+			return NewDefinitionError("latencyMinutes", fmt.Sprintf("%v", latencyRaw), ErrNegativeLatency)
+		}
+		itemDef.Latency = int(latencyRaw)
 	} else { // if latencyMinutes field is not present or not of type integer, set it to default value of 1
 		if m["latencyMinutes"] != nil {
 			return NewDefinitionError("latencyMinutes", fmt.Sprintf("%v", m["latencyMinutes"]), ErrInvalidLatency)
@@ -124,11 +131,16 @@ func CreateItemDefinition(def string, itemDef *ItemDefinition) error {
 			return NewDefinitionError("orderedColumns", "[]", ErrEmptyColumns)
 		}
 		// iterate over each column in the array and create corresponding Column instance
+		columnNames := make(map[string]struct{}, len(columns))
 		for _, col := range columns {
 			cld, err := GetColumnDefinition(col)
 			if err != nil {
 				return err
 			}
+			if _, exists := columnNames[cld.Name]; exists {
+				return NewDefinitionError("orderedColumns", cld.Name, ErrDuplicateColumnName)
+			}
+			columnNames[cld.Name] = struct{}{}
 			itemDef.Columns = append(itemDef.Columns, cld) // add column to columns slice of ItemDefinition
 		}
 	} else { // orderedColumns field is not present or not of type array
@@ -148,6 +160,9 @@ func GetColumnDefinition(column interface{}) (Column, error) {
 
 		// check if the colMap contains name field of type string
 		if name, ok := colMap["name"].(string); ok {
+			if name == "timestamp" {
+				return cld, NewColumnError("name", name, ErrReservedName)
+			}
 			cld.Name = name
 		} else {
 			return cld, NewColumnError("name", fmt.Sprintf("%v", colMap["name"]), ErrInvalidColumnName)
