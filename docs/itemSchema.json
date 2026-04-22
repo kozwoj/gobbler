@@ -1,0 +1,25 @@
+{
+  "title": "itemTypeSchema",
+  "description": "item (log entry) type description",
+  "type": "object",
+  "properties": {
+    "name": {"type": "string"},
+    "documentation": {"type": "string", "optional": true},
+    "folder": {"type": "string", "minLength": 3, "optional": true},
+    "latencyMinutes": {"type": "integer", "optional": true},
+    "orderedColumns": {
+      "type": "array",
+      "items": {  
+        "type": "object",
+        "properties": {
+          "name": { "type": "string"},  
+          "type": { "type": "string"},
+          "optional": { "type": "boolean", "optional": true},
+          "defaultValue": { "type": ["string", "number", "boolean"], "optional": true}
+        }
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    }
+  }
+}

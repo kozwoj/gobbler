@@ -1,0 +1,163 @@
+[
+
+	{
+		"name": "allscalars",
+		"documentation": "table with all scalar types",
+		"folder": "folderOne",
+		"latencyMinutes": 10,
+		"orderedColumns": [
+			{
+				"name": "_string",
+				"type": "string",
+				"defaultValue": "value",
+				"optional": true
+			},
+			{
+				"name": "_boolean",
+				"type": "bool",
+				"optional": false
+			},
+			{
+				"name": "_datetime",
+				"type": "datetime",
+				"defaultValue": "2000-01-01 00:00:01.100",
+				"optional": false
+			},
+			{
+				"name": "_dynamic",
+				"type": "dynamic",
+				"defaultValue": "{\"key\": \"value\"}",
+				"optional": false
+			},
+			{
+				"name": "_int",
+				"type": "int",
+				"defaultValue": 10,
+				"optional": false
+			},
+			{
+				"name": "_real",
+				"type": "real",
+				"defaultValue": 55.55
+			},
+			{
+				"name": "_timespan",
+				"type": "timespan",
+				"optional": true
+			}
+		]
+	}, 
+
+	{
+		"name": "somescalars",
+		"documentation": "table with selected scalar types",
+		"folder": "folderTwo",
+		"latencyMinutes": 10,
+		"orderedColumns": [
+			{
+				"name": "_string",
+				"type": "string",
+				"defaultValue": "value"
+			},
+			{
+				"name": "_boolean",
+				"type": "bool",
+				"optional": false,
+				"defaultValue": true
+			},
+			{
+				"name": "_datetime",
+				"type": "datetime",
+				"optional": false
+			},
+			{
+				"name": "_int",
+				"type": "int",
+				"optional": false
+			},
+			{
+				"name": "_real",
+				"type": "real",
+				"defaultValue": 55.55
+			}
+		]
+	},
+
+	{
+		"name": "vmShutdown",
+		"documentation": "virtual machine shutdown event",
+		"folder": "administration",
+		"latencyMinutes": 10,
+		"orderedColumns": [
+			{
+				"name": "vmId",
+				"type": "string"
+			},
+			{
+				"name": "shutdownStart",
+				"type": "datetime"
+			},
+			{
+				"name": "shutdownReason",
+				"type": "string",
+				"defaultValue": "unknown",
+				"optional": false
+			}
+		]
+	}, 
+
+	{
+		"name": "vmStart",
+		"documentation": "virtual machine start event",
+		"folder": "administration",
+		"latencyMinutes": 10,
+		"orderedColumns": [
+			{
+				"name": "vmId",
+				"type": "string"
+			},
+			{
+				"name": "startTime",
+				"type": "datetime"
+			}
+		]
+	}, 
+
+	{
+		"name": "vmReboot",
+		"documentation": "virtual machine reboot event",
+		"folder": "administration",
+		"latencyMinutes": 10,
+		"orderedColumns": [
+			{
+				"name": "vmId",
+				"type": "string"
+			},
+			{
+				"name": "eventTime",
+				"type": "datetime"
+			},
+			{
+				"name": "rebootStart",
+				"type": "datetime"
+			},
+			{
+				"name": "rebootDuration",
+				"type": "timespan",
+				"optional": true
+			},
+			{
+				"name": "rebootReason",
+				"type": "string",
+				"defaultValue": "unknown",
+				"optional": false
+			},
+			{
+				"name": "OS",
+				"type": "dynamic",
+				"defaultValue": "{\"os\": \"Windows\", \"version\": \"11\"}",
+				"optional": false
+			}
+		]
+	}
+]
