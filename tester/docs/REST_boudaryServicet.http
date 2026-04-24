@@ -1,13 +1,13 @@
 // **************************** type definitions ****************************
 
 ###
-POST http://localhost:3000/v1/definition/list
+POST http://localhost:3000/definition/list
 Authorization: Bearer abc123==
 Content-Type: application/json
 
 //------------------- vmReboot -------------------
 ###
-POST http://localhost:3000/v1/definition/new
+POST http://localhost:3000/definition/add
 Authorization: Bearer abc123==
 Content-Type: application/json
 
@@ -29,14 +29,14 @@ Content-Type: application/json
 ]
 
 ###
-POST http://localhost:3000/v1/definition/get
+POST http://localhost:3000/definition/list
 Authorization: Bearer abc123==
 Content-Type: application/json
 
 [ "vmReboot" ]
 
 ###
-POST http://localhost:3000/v1/definition/delete
+POST http://localhost:3000/definition/remove
 Authorization: Bearer abc123==
 Content-Type: application/json
 
@@ -45,7 +45,7 @@ Content-Type: application/json
 
 //------------------- vmShutdown ------------------- 
 ###
-POST http://localhost:3000/v1/definition/new
+POST http://localhost:3000/definition/add
 Authorization: Bearer abc123==
 Content-Type: application/json
 
@@ -64,14 +64,14 @@ Content-Type: application/json
 ]
 
 ###
-POST http://localhost:3000/v1/definition/get
+POST http://localhost:3000/definition/list
 Authorization: Bearer abc123==
 Content-Type: application/json
 
 [ "vmShutdown" ]
 
 ###
-POST http://localhost:3000/v1/definition/delete
+POST http://localhost:3000/definition/remove
 Authorization: Bearer abc123==
 Content-Type: application/json
 
@@ -80,7 +80,7 @@ Content-Type: application/json
 
 // ------------------- allscalars -------------------
 ###
-POST http://localhost:3000/v1/definition/new
+POST http://localhost:3000/definition/add
 Authorization: Bearer abc123==
 Content-Type: application/json
 
@@ -104,14 +104,14 @@ Content-Type: application/json
 
 
 ###
-POST http://localhost:3000/v1/definition/get
+POST http://localhost:3000/definition/list
 Authorization: Bearer abc123==
 Content-Type: application/json
 
 [ "allscalars" ]
 
 ###
-POST http://localhost:3000/v1/definition/delete
+POST http://localhost:3000/definition/remove
 Authorization: Bearer abc123==
 Content-Type: application/json
 
@@ -121,7 +121,7 @@ Content-Type: application/json
 // **************************** ingestion ****************************
 
 ###
-POST http://localhost:3000/v1/ingest
+POST http://localhost:3000/ingest
 Authorization: Bearer abc123==
 Content-Type: application/json
 
@@ -132,7 +132,7 @@ Content-Type: application/json
 
 
 ###
-POST http://localhost:3000/v1/ingest
+POST http://localhost:3000/ingest
 Authorization: Bearer abc123==
 Content-Type: application/json
 
@@ -142,7 +142,7 @@ Content-Type: application/json
 ]
 
 ###
-POST http://localhost:3000/v1/ingest
+POST http://localhost:3000/ingest
 Authorization: Bearer abc123==
 Content-Type: application/json
 
@@ -151,7 +151,7 @@ Content-Type: application/json
 ]
 
 ###
-POST http://localhost:3000/v1/ingest
+POST http://localhost:3000/ingest
 Authorization: Bearer abc123==
 Content-Type: application/json
 
@@ -165,7 +165,7 @@ Content-Type: application/json
 
 // ------------------- somescalars -------------------
 ###
-POST http://localhost:3000/v1/definition/new
+POST http://localhost:3000/definition/add
 Authorization: Bearer abc123==
 Content-Type: application/json
 
@@ -187,7 +187,7 @@ Content-Type: application/json
 ]
 
 ###
-POST http://localhost:3000/v1/ingest
+POST http://localhost:3000/ingest
 Authorization: Bearer abc123==
 Content-Type: application/json
 
@@ -196,7 +196,7 @@ Content-Type: application/json
 ]
 
 ###
-POST http://localhost:3000/v1/ingest
+POST http://localhost:3000/ingest
 Authorization: Bearer abc123==
 Content-Type: application/json
 
