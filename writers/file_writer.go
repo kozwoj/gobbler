@@ -88,6 +88,36 @@ func (w *FileWriter) Add(item pipeline.CSVitem) {
 	}
 }
 
+// Rotate forces an immediate close of the current file and ensures the next write
+// goes to a new timestamped file. Safe to call from the management REST endpoint.
+func (w *FileWriter) Rotate() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.buffer) > 0 {
+		// Write buffered lines to the current file before closing it.
+		if w.file == nil {
+			// No file open yet; open one now so buffered data is not lost.
+			fname := fmt.Sprintf("%s_%s.csv", time.Now().Format("2006-01-02_15-04-05"), w.typeName)
+			f, err := os.OpenFile(filepath.Join(w.outputDir, fname), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+			if err != nil {
+				fmt.Println("writers: FileWriter: Rotate: open file:", err)
+				return
+			}
+			w.file = f
+		}
+		if _, err := w.file.WriteString(strings.Join(w.buffer, "\n") + "\n"); err != nil {
+			fmt.Println("writers: FileWriter: Rotate: write:", err)
+			return
+		}
+		w.buffer = nil
+	}
+	if w.file != nil {
+		w.file.Close()
+		w.file = nil
+		w.fileStart = time.Time{} // zero → flush will always open a new file next time
+	}
+}
+
 // flush writes buffered lines to the current file, rotating to a new file when
 // the current one has exceeded maxAge. Caller must hold mu.
 func (w *FileWriter) flush() {

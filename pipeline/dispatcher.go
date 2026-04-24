@@ -23,6 +23,8 @@ func Start(ctx context.Context, wg *sync.WaitGroup, queueSize int) {
 	inputQueue = make(chan CSVitem, queueSize)
 
 	wg.Add(1)
+	// the dispatcher goroutine reads from the central input queue and routes items to per-type queues
+	// based on the current routing table.
 	go func() {
 		defer wg.Done()
 		for {
@@ -34,7 +36,7 @@ func Start(ctx context.Context, wg *sync.WaitGroup, queueSize int) {
 				if desc := (*table)[item.Type]; desc != nil {
 					select {
 					case desc.Queue <- item:
-						// routed
+						// routed to per-type queue
 					default:
 						// per-type queue full: drop (writer is the backpressure boundary)
 					}
@@ -74,4 +76,14 @@ func AddItemType(t ItemType, desc *TypeDescriptor) {
 	}
 	newTable[t] = desc
 	routing.Store(&newTable)
+}
+
+// Reset clears all pipeline state after the pipeline has been fully stopped.
+// It must only be called after wg.Wait() has returned, guaranteeing that the
+// dispatcher and all worker goroutines have exited.
+// After Reset the pipeline can be reconfigured and started again with Start.
+func Reset() {
+	inputQueue = nil
+	empty := make(RoutingTable)
+	routing.Store(&empty)
 }

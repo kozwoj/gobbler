@@ -27,7 +27,16 @@ func NewWorker[T any](ctx context.Context, wg *sync.WaitGroup, queueSize int, ha
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				// Drain any items already in the queue before exiting so that
+				// the writer's buffer receives everything enqueued before shutdown.
+				for {
+					select {
+					case item := <-w.Queue:
+						handler(item)
+					default:
+						return
+					}
+				}
 			case item := <-w.Queue:
 				handler(item)
 			}

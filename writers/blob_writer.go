@@ -109,6 +109,24 @@ func (w *BlobWriter) Add(item pipeline.CSVitem) {
 	}
 }
 
+// Rotate forces an immediate flush of the current blob and ensures the next write
+// goes to a new timestamped blob. Safe to call from the management REST endpoint.
+func (w *BlobWriter) Rotate() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.buffer) > 0 && w.blobClient != nil {
+		payload := strings.Join(w.buffer, "\n") + "\n"
+		if _, err := w.blobClient.AppendBlock(context.Background(), readSeekCloser{strings.NewReader(payload)}, nil); err != nil {
+			fmt.Println("writers: BlobWriter: Rotate: append:", err)
+			return
+		}
+		w.buffer = nil
+	}
+	// Nil the client so flush creates a new blob on the next write.
+	w.blobClient = nil
+	w.blobStart = time.Time{}
+}
+
 // flush writes buffered lines to the current append blob, rotating to a new blob
 // when the current one has exceeded maxAge. Caller must hold mu.
 func (w *BlobWriter) flush() {

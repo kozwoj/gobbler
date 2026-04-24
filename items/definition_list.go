@@ -7,8 +7,9 @@ that are available for validating and converting input items.
 */
 type DefinitionList map[string]ItemDefinition
 
-/* AddDefinition function takes a parsed ItemDefinition and adds it to the DefinitionList. It returns an error if the definition is invalid or if a definition with the same item type name already exists in the DefinitionList.
- */
+/* AddDefinition function takes a parsed ItemDefinition and adds it to the DefinitionList. It returns an error if the
+definition is invalid or if a definition with the same item type name already exists in the DefinitionList.
+*/
 func (dl DefinitionList) AddDefinition(def ItemDefinition) error {
 	if _, exists := dl[def.TypeName]; exists {
 		return NewDefinitionError("name", def.TypeName, ErrDefinitionAlreadyExists)
