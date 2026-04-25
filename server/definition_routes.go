@@ -1,9 +1,13 @@
 package server
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/kozwoj/gobbler/items"
+	"github.com/kozwoj/gobbler/pipeline"
 )
 
 func (s *Server) definitionRoutes(r chi.Router) {
@@ -32,15 +36,87 @@ func (s *Server) handleDefinitionDiscovery(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleDefinitionAdd(w http.ResponseWriter, r *http.Request) {
-	sendError(w, http.StatusNotImplemented, "not implemented")
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		sendError(w, http.StatusBadRequest, "could not read request body")
+		return
+	}
+
+	var def items.ItemDefinition
+	if err := items.CreateItemDefinition(string(body), &def); err != nil {
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.definitions.AddDefinition(def); err != nil {
+		sendError(w, http.StatusConflict, err.Error())
+		return
+	}
+
+	if s.running {
+		if err := s.startType(def); err != nil {
+			// Undo the definition registration so state stays consistent.
+			s.definitions.RemoveDefinition(def.TypeName)
+			sendError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+
+	sendJSON(w, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleDefinitionList(w http.ResponseWriter, r *http.Request) {
-	sendError(w, http.StatusNotImplemented, "not implemented")
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	list := make([]items.ItemDefinition, 0, len(s.definitions))
+	for _, def := range s.definitions {
+		list = append(list, def)
+	}
+	sendJSON(w, list)
 }
 
 func (s *Server) handleDefinitionRemove(w http.ResponseWriter, r *http.Request) {
-	sendError(w, http.StatusNotImplemented, "not implemented")
+	var req struct {
+		TypeName string `json:"typeName"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.TypeName == "" {
+		sendError(w, http.StatusBadRequest, "typeName is required")
+		return
+	}
+
+	s.mu.Lock()
+
+	if _, err := s.definitions.GetDefinition(req.TypeName); err != nil {
+		s.mu.Unlock()
+		sendError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	var entry *typeEntry
+	if s.running {
+		t := pipeline.ItemType(req.TypeName)
+		if e, ok := s.types[t]; ok {
+			// Remove from routing table first so no new items are routed here.
+			pipeline.RemoveItemType(t)
+			delete(s.types, t)
+			entry = e
+		}
+	}
+
+	s.definitions.RemoveDefinition(req.TypeName)
+	s.mu.Unlock()
+
+	// Stop the type's goroutines outside the lock.
+	if entry != nil {
+		entry.cancel()
+		entry.wg.Wait()
+	}
+
+	sendJSON(w, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleDefinitionAddHelp(w http.ResponseWriter, r *http.Request) {

@@ -1,9 +1,12 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/kozwoj/gobbler/pipeline"
 )
 
 func (s *Server) pipelineRoutes(r chi.Router) {
@@ -40,23 +43,184 @@ func (s *Server) handlePipelineDiscovery(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handlePipelineConfigure(w http.ResponseWriter, r *http.Request) {
-	sendError(w, http.StatusNotImplemented, "not implemented")
+	var req struct {
+		Mode             string `json:"mode"`
+		OutputDir        string `json:"outputDir"`
+		AccountName      string `json:"accountName"`
+		AccountKey       string `json:"accountKey"`
+		CentralQueueSize int    `json:"centralQueueSize"`
+		WorkerQueueSize  int    `json:"workerQueueSize"`
+		BatchSize        int    `json:"batchSize"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	switch pipeline.StorageMode(req.Mode) {
+	case pipeline.StorageModeFile:
+		if req.OutputDir == "" {
+			sendError(w, http.StatusBadRequest, "outputDir is required for file mode")
+			return
+		}
+	case pipeline.StorageModeBlob:
+		if req.AccountName == "" || req.AccountKey == "" {
+			sendError(w, http.StatusBadRequest, "accountName and accountKey are required for blob mode")
+			return
+		}
+	default:
+		sendError(w, http.StatusBadRequest, `mode must be "file" or "blob"`)
+		return
+	}
+
+	cfg := &pipeline.Config{
+		Mode:             pipeline.StorageMode(req.Mode),
+		OutputDir:        req.OutputDir,
+		AccountName:      req.AccountName,
+		AccountKey:       req.AccountKey,
+		CentralQueueSize: req.CentralQueueSize,
+		WorkerQueueSize:  req.WorkerQueueSize,
+		BatchSize:        req.BatchSize,
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.running {
+		sendError(w, http.StatusConflict, "cannot reconfigure while pipeline is running; stop it first")
+		return
+	}
+
+	s.config = cfg
+	sendJSON(w, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handlePipelineStart(w http.ResponseWriter, r *http.Request) {
-	sendError(w, http.StatusNotImplemented, "not implemented")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.config == nil {
+		sendError(w, http.StatusConflict, "pipeline not configured; call pipeline/configure first")
+		return
+	}
+	if s.running {
+		sendError(w, http.StatusConflict, "pipeline is already running")
+		return
+	}
+	if len(s.definitions) == 0 {
+		sendError(w, http.StatusConflict, "no item type definitions registered; call definition/add first")
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.pipelineCtx = ctx
+	s.cancel = cancel
+
+	pipeline.Start(ctx, &s.wg, s.config.CentralQueueSize)
+
+	for _, def := range s.definitions {
+		if err := s.startType(def); err != nil {
+			// Roll back: cancel all goroutines started so far, then reset.
+			cancel()
+			s.wg.Wait()
+			for _, entry := range s.types {
+				entry.wg.Wait()
+			}
+			pipeline.Reset()
+			s.pipelineCtx = nil
+			s.cancel = nil
+			s.types = make(map[pipeline.ItemType]*typeEntry)
+			sendError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+
+	s.running = true
+	sendJSON(w, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handlePipelineStop(w http.ResponseWriter, r *http.Request) {
-	sendError(w, http.StatusNotImplemented, "not implemented")
+	s.mu.Lock()
+
+	if !s.running {
+		s.mu.Unlock()
+		sendError(w, http.StatusConflict, "pipeline is not running")
+		return
+	}
+
+	// Mark stopped and capture state before releasing the lock.
+	s.running = false
+	cancel := s.cancel
+	s.cancel = nil
+	s.pipelineCtx = nil
+	types := s.types
+	s.types = make(map[pipeline.ItemType]*typeEntry)
+	s.mu.Unlock()
+
+	// Cancel and drain all goroutines outside the lock.
+	cancel()
+	s.wg.Wait()
+	for _, entry := range types {
+		entry.wg.Wait()
+	}
+	pipeline.Reset()
+
+	sendJSON(w, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handlePipelineRotate(w http.ResponseWriter, r *http.Request) {
-	sendError(w, http.StatusNotImplemented, "not implemented")
+	var req struct {
+		TypeName string `json:"typeName"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.TypeName == "" {
+		sendError(w, http.StatusBadRequest, "typeName is required")
+		return
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.running {
+		sendError(w, http.StatusConflict, "pipeline is not running")
+		return
+	}
+
+	entry, ok := s.types[pipeline.ItemType(req.TypeName)]
+	if !ok {
+		sendError(w, http.StatusNotFound, "unknown type: "+req.TypeName)
+		return
+	}
+
+	entry.writer.Rotate()
+	sendJSON(w, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handlePipelineStatus(w http.ResponseWriter, r *http.Request) {
-	sendError(w, http.StatusNotImplemented, "not implemented")
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	status := map[string]interface{}{
+		"configured":            s.config != nil,
+		"running":               s.running,
+		"registeredDefinitions": len(s.definitions),
+	}
+
+	if s.config != nil {
+		status["mode"] = string(s.config.Mode)
+		status["centralQueueSize"] = s.config.CentralQueueSize
+		status["workerQueueSize"] = s.config.WorkerQueueSize
+		status["batchSize"] = s.config.BatchSize
+	}
+
+	if s.running {
+		typeNames := make([]string, 0, len(s.types))
+		for t := range s.types {
+			typeNames = append(typeNames, string(t))
+		}
+		status["activeTypes"] = typeNames
+	}
+
+	sendJSON(w, status)
 }
 
 func (s *Server) handlePipelineConfigureHelp(w http.ResponseWriter, r *http.Request) {

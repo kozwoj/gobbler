@@ -27,3 +27,14 @@ func (dl DefinitionList) GetDefinition(typeName string) (ItemDefinition, error) 
 	}
 	return def, nil
 }
+
+/* RemoveDefinition removes the definition with the given type name from the DefinitionList.
+It returns an error if no definition with the given type name exists.
+*/
+func (dl DefinitionList) RemoveDefinition(typeName string) error {
+	if _, exists := dl[typeName]; !exists {
+		return NewDefinitionError("name", typeName, ErrDefinitionNotFound)
+	}
+	delete(dl, typeName)
+	return nil
+}

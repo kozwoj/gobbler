@@ -78,6 +78,20 @@ func AddItemType(t ItemType, desc *TypeDescriptor) {
 	routing.Store(&newTable)
 }
 
+// RemoveItemType removes the TypeDescriptor for the given ItemType from the routing table.
+// The swap is atomic so the dispatcher never sees a partial update.
+// Call this from the REST definition endpoint before stopping the writer.
+func RemoveItemType(t ItemType) {
+	old := routing.Load()
+	newTable := make(RoutingTable, len(*old))
+	for k, v := range *old {
+		if k != t {
+			newTable[k] = v
+		}
+	}
+	routing.Store(&newTable)
+}
+
 // Reset clears all pipeline state after the pipeline has been fully stopped.
 // It must only be called after wg.Wait() has returned, guaranteeing that the
 // dispatcher and all worker goroutines have exited.
