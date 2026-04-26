@@ -17,8 +17,8 @@ The decision to use either file or blob mode for all writers, and not to mix the
 To select the mode Gobbler provides REST endpoint `gobbler/pipeline/configure`. The endpoint accepts JSON object of the following schema
 ``` JSON
 {
-  "title": "gobblerStorageModeSchema",
-  "description": "describes the storage mode of gobbler instance",
+  "title": "gobblerConfigurationSchema",
+  "description": "describes storage mode and other pipeline properties",
   "type": "object",
   "properties": {
     "mode": {"type": "string", "optional": false},
