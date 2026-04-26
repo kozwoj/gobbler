@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/kozwoj/gobbler/pipeline"
+	"github.com/kozwoj/gobbler/tester"
 )
 
 // ---- Category F: Rotate ----
@@ -31,11 +32,11 @@ func TestF_Rotate(t *testing.T) {
 	// F1 — ingest 3 items (well below batchSize=50); status must show itemsInBuffer > 0
 	// and currentOutput == "" because no flush has happened yet.
 	t.Run("F1_BufferedBeforeFlush", func(t *testing.T) {
-		w := do(t, router, http.MethodPost, "/gobbler/ingest", `[
-			{"alpha": {"alphaStr": "one",   "alphaInt": 1, "alphaDate": "2026-04-25 10:00:00.000"}},
-			{"alpha": {"alphaStr": "two",   "alphaInt": 2, "alphaDate": "2026-04-25 10:00:01.000"}},
-			{"alpha": {"alphaStr": "three", "alphaInt": 3, "alphaDate": "2026-04-25 10:00:02.000"}}
-		]`)
+		f1Batch, err := tester.NewAlphaGenerator().GenerateJSONArray(3)
+		if err != nil {
+			t.Fatalf("generate alpha: %v", err)
+		}
+		w := do(t, router, http.MethodPost, "/gobbler/ingest", f1Batch)
 		if w.Code != http.StatusOK {
 			t.Fatalf("ingest: %d %s", w.Code, w.Body.String())
 		}
@@ -85,10 +86,11 @@ func TestF_Rotate(t *testing.T) {
 	// F3 — ingest more items and wait for the flush tick; a second CSV file must
 	// appear in alphaFolder (the first was written by the rotate in F2).
 	t.Run("F3_SecondFileAfterRotate", func(t *testing.T) {
-		w := do(t, router, http.MethodPost, "/gobbler/ingest", `[
-			{"alpha": {"alphaStr": "four", "alphaInt": 4, "alphaDate": "2026-04-25 10:00:03.000"}},
-			{"alpha": {"alphaStr": "five", "alphaInt": 5, "alphaDate": "2026-04-25 10:00:04.000"}}
-		]`)
+		f3Batch, err := tester.NewAlphaGenerator().GenerateJSONArray(2)
+		if err != nil {
+			t.Fatalf("generate alpha: %v", err)
+		}
+		w := do(t, router, http.MethodPost, "/gobbler/ingest", f3Batch)
 		if w.Code != http.StatusOK {
 			t.Fatalf("second ingest: %d %s", w.Code, w.Body.String())
 		}

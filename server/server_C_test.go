@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kozwoj/gobbler/pipeline"
+	"github.com/kozwoj/gobbler/tester"
 )
 
 // alphaDef and betaDef are the JSON item type definitions used across Category C tests.
@@ -42,8 +43,8 @@ func configureFileMode(t *testing.T, router http.Handler, outputDir string) {
 	cfgBytes, _ := json.Marshal(map[string]interface{}{
 		"mode":             "file",
 		"outputDir":        outputDir,
-		"centralQueueSize": 100,
-		"workerQueueSize":  10,
+		"centralQueueSize": 1000,
+		"workerQueueSize":  200,
 		"batchSize":        50,
 	})
 	w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure", string(cfgBytes))
@@ -149,13 +150,16 @@ func TestC_HappyPath(t *testing.T) {
 	const alphaCount = 3
 	const betaCount = 2
 	t.Run("C7_Ingest", func(t *testing.T) {
-		batch := `[
-			{"alpha": {"alphaStr": "one",   "alphaInt": 1, "alphaDate": "2026-04-25 10:00:00.000"}},
-			{"alpha": {"alphaStr": "two",   "alphaInt": 2, "alphaDate": "2026-04-25 10:00:01.000"}},
-			{"alpha": {"alphaStr": "three", "alphaInt": 3, "alphaDate": "2026-04-25 10:00:02.000"}},
-			{"beta":  {"betaStr": "x", "betaBool": true,  "betaReal": 1.1}},
-			{"beta":  {"betaStr": "y", "betaBool": false, "betaReal": 2.2}}
-		]`
+		alphaArray, err := tester.NewAlphaGenerator().GenerateJSONArray(alphaCount)
+		if err != nil {
+			t.Fatalf("generate alpha: %v", err)
+		}
+		betaArray, err := tester.NewBetaGenerator().GenerateJSONArray(betaCount)
+		if err != nil {
+			t.Fatalf("generate beta: %v", err)
+		}
+		// Merge into a single JSON array by stripping the outer brackets and rejoining.
+		batch := alphaArray[:len(alphaArray)-1] + "," + betaArray[1:]
 		w := do(t, router, http.MethodPost, "/gobbler/ingest", batch)
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())

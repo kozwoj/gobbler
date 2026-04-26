@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/kozwoj/gobbler/pipeline"
+	"github.com/kozwoj/gobbler/tester"
 )
 
 // startWithAlpha configures file mode, adds the alpha definition, and starts
@@ -121,12 +122,16 @@ func TestD4_MixedBatch(t *testing.T) {
 
 	// 2 valid alpha items + 1 unknown type + 1 alpha with wrong field type = 4 total
 	const total = 4
-	w := do(t, router, http.MethodPost, "/gobbler/ingest", `[
-		{"alpha": {"alphaStr": "one",   "alphaInt": 1, "alphaDate": "2026-04-25 10:00:00.000"}},
-		{"alpha": {"alphaStr": "two",   "alphaInt": 2, "alphaDate": "2026-04-25 10:00:01.000"}},
+	validAlpha, err := tester.NewAlphaGenerator().GenerateJSONArray(2)
+	if err != nil {
+		t.Fatalf("generate alpha: %v", err)
+	}
+	// Strip outer brackets from the valid portion and splice in the invalid items.
+	batch := validAlpha[:len(validAlpha)-1] + `,
 		{"unknownType": {"field": "value"}},
-		{"alpha": {"alphaStr": "bad",   "alphaInt": "wrong", "alphaDate": "2026-04-25 10:00:02.000"}}
-	]`)
+		{"alpha": {"alphaStr": "bad", "alphaInt": "wrong", "alphaDate": "2026-04-25 10:00:02.000"}}
+	]`
+	w := do(t, router, http.MethodPost, "/gobbler/ingest", batch)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}

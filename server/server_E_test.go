@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/kozwoj/gobbler/pipeline"
+	"github.com/kozwoj/gobbler/tester"
 )
 
 const gammaDef = `{
@@ -103,11 +104,11 @@ func TestE_HotAddRemove(t *testing.T) {
 	// E3 — ingest N gamma items; after flush tick itemsWritten must equal N.
 	const gammaCount = 3
 	t.Run("E3_IngestGamma", func(t *testing.T) {
-		w := do(t, router, http.MethodPost, "/gobbler/ingest", `[
-			{"gamma": {"gammaInt": 1, "gammaStr": "a", "gammaDynamic": "{\"k\":1}"}},
-			{"gamma": {"gammaInt": 2, "gammaStr": "b", "gammaDynamic": "{\"k\":2}"}},
-			{"gamma": {"gammaInt": 3, "gammaStr": "c", "gammaDynamic": "{\"k\":3}"}}
-		]`)
+		gammaArray, err := tester.NewGammaGenerator().GenerateJSONArray(gammaCount)
+		if err != nil {
+			t.Fatalf("generate gamma: %v", err)
+		}
+		w := do(t, router, http.MethodPost, "/gobbler/ingest", gammaArray)
 		if w.Code != http.StatusOK {
 			t.Fatalf("ingest gamma: %d %s", w.Code, w.Body.String())
 		}
@@ -148,9 +149,11 @@ func TestE_HotAddRemove(t *testing.T) {
 
 	// E5 — ingesting gamma after removal lands everything in rejected.
 	t.Run("E5_IngestAfterRemove", func(t *testing.T) {
-		w := do(t, router, http.MethodPost, "/gobbler/ingest", `[
-			{"gamma": {"gammaInt": 9, "gammaStr": "z", "gammaDynamic": "{\"k\":9}"}}
-		]`)
+		gammaArray, err := tester.NewGammaGenerator().GenerateJSONArray(1)
+		if err != nil {
+			t.Fatalf("generate gamma: %v", err)
+		}
+		w := do(t, router, http.MethodPost, "/gobbler/ingest", gammaArray)
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 		}

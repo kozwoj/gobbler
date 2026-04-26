@@ -90,7 +90,7 @@ Table-driven tests using `net/http/httptest` and `httptest.NewRecorder`. Tests l
 | G3 | `POST /gobbler/pipeline/stop` when not running | 409 |
 | G4 | `POST /gobbler/definition/add` with duplicate name | 409 |
 | G5 | `POST /gobbler/definition/remove` with non-existent name | 404 |
-| G6 | Stop → reconfigure with different `outputDir` → re-add definitions → start | 200 at each step; writes go to new dir |
+| G6 | Stop → reconfigure with different `outputDir` → start | 200 at each step; writes go to new dir |
 | G7 | `GET /gobbler/pipeline/status` after stop | `running: false`; `types` key absent from response |
 
 ### Category H — Writer stats accuracy
