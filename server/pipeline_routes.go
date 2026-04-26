@@ -44,13 +44,12 @@ func (s *Server) handlePipelineDiscovery(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handlePipelineConfigure(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Mode             string `json:"mode"`
-		OutputDir        string `json:"outputDir"`
-		AccountName      string `json:"accountName"`
-		AccountKey       string `json:"accountKey"`
-		CentralQueueSize int    `json:"centralQueueSize"`
-		WorkerQueueSize  int    `json:"workerQueueSize"`
-		BatchSize        int    `json:"batchSize"`
+		Mode            string `json:"mode"`
+		OutputDir       string `json:"outputDir"`
+		AccountName     string `json:"accountName"`
+		AccountKey      string `json:"accountKey"`
+		WorkerQueueSize int    `json:"workerQueueSize"`
+		BatchSize       int    `json:"batchSize"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sendError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
@@ -74,13 +73,12 @@ func (s *Server) handlePipelineConfigure(w http.ResponseWriter, r *http.Request)
 	}
 
 	cfg := &pipeline.Config{
-		Mode:             pipeline.StorageMode(req.Mode),
-		OutputDir:        req.OutputDir,
-		AccountName:      req.AccountName,
-		AccountKey:       req.AccountKey,
-		CentralQueueSize: req.CentralQueueSize,
-		WorkerQueueSize:  req.WorkerQueueSize,
-		BatchSize:        req.BatchSize,
+		Mode:            pipeline.StorageMode(req.Mode),
+		OutputDir:       req.OutputDir,
+		AccountName:     req.AccountName,
+		AccountKey:      req.AccountKey,
+		WorkerQueueSize: req.WorkerQueueSize,
+		BatchSize:       req.BatchSize,
 	}
 
 	s.mu.Lock()
@@ -205,7 +203,6 @@ func (s *Server) handlePipelineStatus(w http.ResponseWriter, r *http.Request) {
 
 	if s.config != nil {
 		status["mode"] = string(s.config.Mode)
-		status["centralQueueSize"] = s.config.CentralQueueSize
 		status["workerQueueSize"] = s.config.WorkerQueueSize
 		status["batchSize"] = s.config.BatchSize
 	}
@@ -234,13 +231,12 @@ func (s *Server) handlePipelineConfigureHelp(w http.ResponseWriter, r *http.Requ
 		"method":      "POST",
 		"endpoint":    "/gobbler/pipeline/configure",
 		"input": map[string]string{
-			"mode":             `"file" or "blob"`,
-			"outputDir":        "string - required when mode is \"file\"",
-			"accountName":      "string - required when mode is \"blob\"",
-			"accountKey":       "string - required when mode is \"blob\"",
-			"centralQueueSize": "integer",
-			"workerQueueSize":  "integer",
-			"batchSize":        "integer",
+			"mode":            `"file" or "blob"`,
+			"outputDir":       "string - required when mode is \"file\"",
+			"accountName":     "string - required when mode is \"blob\"",
+			"accountKey":      "string - required when mode is \"blob\"",
+			"workerQueueSize": "integer",
+			"batchSize":       "integer",
 		},
 		"returns": `{"status": "ok"} or {"error": "..."}`,
 	})

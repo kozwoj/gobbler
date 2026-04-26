@@ -12,11 +12,10 @@ const (
 // Populated by the gobbler/pipeline/configure REST endpoint before the
 // pipeline is started.
 type Config struct {
-	Mode             StorageMode
-	OutputDir        string // file mode only
-	AccountName      string // blob mode only
-	AccountKey       string // blob mode only
-	CentralQueueSize int
-	WorkerQueueSize  int
-	BatchSize        int
+	Mode            StorageMode
+	OutputDir       string // file mode only
+	AccountName     string // blob mode only
+	AccountKey      string // blob mode only
+	WorkerQueueSize int
+	BatchSize       int
 }

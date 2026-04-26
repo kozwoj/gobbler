@@ -30,11 +30,10 @@ func TestG2_ConfigureWhenRunning(t *testing.T) {
 	defer do(t, router, http.MethodPost, "/gobbler/pipeline/stop", "")
 
 	cfgBytes, _ := json.Marshal(map[string]interface{}{
-		"mode":             "file",
-		"outputDir":        t.TempDir(),
-		"centralQueueSize": 100,
-		"workerQueueSize":  10,
-		"batchSize":        50,
+		"mode":            "file",
+		"outputDir":       t.TempDir(),
+		"workerQueueSize": 10,
+		"batchSize":       50,
 	})
 	w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure", string(cfgBytes))
 	if w.Code != http.StatusConflict {
@@ -105,11 +104,10 @@ func TestG6_StopReconfigureRestart(t *testing.T) {
 
 	// Reconfigure to dir2.
 	cfg2, _ := json.Marshal(map[string]interface{}{
-		"mode":             "file",
-		"outputDir":        dir2,
-		"centralQueueSize": 100,
-		"workerQueueSize":  10,
-		"batchSize":        50,
+		"mode":            "file",
+		"outputDir":       dir2,
+		"workerQueueSize": 10,
+		"batchSize":       50,
 	})
 	if w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure", string(cfg2)); w.Code != http.StatusOK {
 		t.Fatalf("reconfigure: %d %s", w.Code, w.Body.String())

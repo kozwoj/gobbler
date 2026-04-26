@@ -110,11 +110,10 @@ func TestH4_BatchSizeImmediate(t *testing.T) {
 
 	outputDir := t.TempDir()
 	cfgBytes, _ := json.Marshal(map[string]interface{}{
-		"mode":             "file",
-		"outputDir":        outputDir,
-		"centralQueueSize": 200,
-		"workerQueueSize":  100,
-		"batchSize":        batchSize,
+		"mode":            "file",
+		"outputDir":       outputDir,
+		"workerQueueSize": 100,
+		"batchSize":       batchSize,
 	})
 	s := New()
 	router := newTestRouter(s)

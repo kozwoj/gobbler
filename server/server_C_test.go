@@ -41,11 +41,10 @@ const betaDef = `{
 func configureFileMode(t *testing.T, router http.Handler, outputDir string) {
 	t.Helper()
 	cfgBytes, _ := json.Marshal(map[string]interface{}{
-		"mode":             "file",
-		"outputDir":        outputDir,
-		"centralQueueSize": 1000,
-		"workerQueueSize":  200,
-		"batchSize":        50,
+		"mode":            "file",
+		"outputDir":       outputDir,
+		"workerQueueSize": 200,
+		"batchSize":       50,
 	})
 	w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure", string(cfgBytes))
 	if w.Code != http.StatusOK {
