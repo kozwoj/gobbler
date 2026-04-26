@@ -96,18 +96,20 @@ Gobbler has an REST interface for introducing items types, one at a time. In oth
 
 ## The pipeline
 
-Gobbler's exposes REST interface for ingesting log item represented as arrays of JSON records. Items are ingested through a multi‑stage pipeline with type-aware dispatcher, queues and writers. The stages are:
+Gobbler exposes a REST interface for ingesting log items represented as arrays of JSON records. Items are ingested through a pipeline with per‑type workers and writers. The stages are:
 
 **Item Parsing & Validation**
-  - Invalid JSON records are rejected immediately
+  - Invalid JSON records are rejected immediately and reported back to the caller
   - Valid records proceed to the next stage
+
 **Conversion to CSV**
-  - Produces a compact, normalized representation of items as CSV strings, with fields corresponding to item types  
-  - The sting is put into a struct with item type and placed in central input queue
-**Central Dispatcher**
-  - Reads from the input queue
-  - Determines item type
-  - Routes each CSV string into the appropriate writer's queue.
+  - Produces a compact, normalized representation of items as CSV strings, with fields in the order defined by the item type
+  - The CSV string is wrapped in a `CSVitem` struct and sent directly to the appropriate per‑type worker queue
+  - If the worker queue is full the item is rejected immediately and reported back to the caller — no silent drops
+
+**Per‑Type Worker**
+  - Each registered item type has its own bounded queue and goroutine
+  - The worker calls the writer's `Add` method for each dequeued item
 
 ## The writers
 
@@ -119,15 +121,26 @@ Each item type has worker with a queue handling items of that type. A worker is 
 
 This is the end of the ingestion pipeline.
 
-## The Rest interface 
+## The REST interface
 
-Gobbler exposes three REST endpoints:  
+Gobbler exposes REST endpoints under the `/gobbler` prefix (default port 8080):
 
-- gobbler/definition -> to adds new item definition
-- gobbler/ingest -> to ingests and saves an array of JSON item objects
-- gobbler/manage/... -> to execute Gobbler server management commands (stats, status, shot down, ...) 
+**Definition management**
+- `GET  /gobbler/definition/list` — list all registered item type definitions
+- `POST /gobbler/definition/add` — register a new item type (body: item definition JSON object)
+- `POST /gobbler/definition/remove` — remove a registered item type (body: `{"typeName": "..."}`)
 
-More detailed outline of the Gobbler architecture is in `docs\pipeline.md` document. 
+**Pipeline management**
+- `POST /gobbler/pipeline/configure` — set storage mode and pipeline parameters
+- `POST /gobbler/pipeline/start` — start the pipeline (requires at least one definition)
+- `POST /gobbler/pipeline/stop` — stop the pipeline and flush all writers
+- `POST /gobbler/pipeline/rotate` — force rotation of a type's current file/blob (body: `{"typeName": "..."}`)
+- `GET  /gobbler/pipeline/status` — return pipeline configuration and running state
+
+**Ingestion**
+- `POST /gobbler/ingest` — ingest an array of typed JSON items (body: `[{"typeName": {...fields}}, ...]`)
+
+More detailed description of the architecture is in the `docs/` folder. 
 
 
 

@@ -1,6 +1,6 @@
 # Server–Pipeline–Writer Wiring
 
-This note describes how the REST server, pipeline dispatcher, per-type workers, and writers are connected at startup and at runtime.
+This note describes how the REST server, per-type workers, and writers are connected at startup and at runtime.
 
 ---
 
@@ -9,12 +9,10 @@ This note describes how the REST server, pipeline dispatcher, per-type workers, 
 ```
 main()
  │
- ├─ pipeline.Start(ctx, wg, centralQueueSize)   // central input queue + dispatcher goroutine
- │
- └─ httpServer.ListenAndServe(...)              // REST endpoints ready
+ └─ httpServer.ListenAndServe(...)   // REST endpoints ready
 ```
 
-The central queue and dispatcher are started once. No item types are registered yet; the ingest endpoint will reject all types until definitions are added.
+No item types are registered at startup; the ingest endpoint will reject all types until definitions are added and the pipeline is started.
 
 ---
 
@@ -42,7 +40,7 @@ The REST definition endpoint performs these steps in order:
    }
 
 7. pipeline.AddItemType(pipeline.ItemType(def.TypeName), desc)
-   // atomic pointer swap → dispatcher and ingest endpoint now recognise this type
+   // atomic pointer swap → ingest endpoint now recognises this type
 ```
 
 After step 7 the ingest endpoint will accept items of this type.
@@ -57,13 +55,13 @@ POST /gobbler/ingest  (body: JSON array of {"typeName": {...}} objects)
  ├─ items.SplitInput(body)                        // split array into []InputItem
  │
  ├─ for each InputItem:
- │   ├─ desc := pipeline.LookupType(typeName)     // nil → 400 unknown type
  │   ├─ csv, errs := items.ConvertItem(item, definitions, timestamp)
  │   │                                             // validate + convert to CSV string
- │   └─ pipeline.Enqueue(pipeline.CSVitem{         // false → 503 overloaded
- │          Type: typeName, CSV: csv})
+ │   ├─ desc := pipeline.LookupType(typeName)     // nil → rejected (type not registered)
+ │   └─ non-blocking send to desc.Queue           // full → rejected (worker queue full)
+ │          CSVitem{Type: typeName, CSV: csv}
  │
- └─ 200 OK (with per-item error details for any rejected items)
+ └─ 200 OK  {"ingested": N, "rejected": [...]}
 ```
 
 ---
@@ -72,15 +70,10 @@ POST /gobbler/ingest  (body: JSON array of {"typeName": {...}} objects)
 
 ```
 ingest endpoint
-      │  pipeline.Enqueue(CSVitem)
+      │  desc := pipeline.LookupType(typeName)   // atomic routing table load
+      │  non-blocking send to desc.Queue
       ▼
- central input queue  (chan CSVitem, capacity = centralQueueSize)
-      │
-      │  dispatcher goroutine (pipeline.Start)
-      │  table := routing.Load()
-      │  desc  := (*table)[item.Type]
-      ▼
- per-type queue  (chan CSVitem, capacity = perTypeQueueSize)
+ per-type queue  (chan CSVitem, capacity = workerQueueSize)
    = desc.Queue = worker.Queue
       │
       │  Worker[CSVitem] goroutine (pipeline.NewWorker)
@@ -91,7 +84,7 @@ ingest endpoint
       │  flush triggered by:
       │    • buffer len ≥ batchSize  (threshold-based, inside Add)
       │    • ticker every 500 ms     (time-based, inside Start goroutine)
-      │    • ctx.Done()              (shutdown flush)
+      │    • ctx.Done()              (shutdown flush, drains queue first)
       ▼
  file:  rootDir/{def.Folder}/{timestamp}_{typeName}.csv
  blob:  https://{account}.blob.core.windows.net/{def.Folder}/{timestamp}_{typeName}
@@ -103,7 +96,6 @@ ingest endpoint
 
 | Component | Goroutines | Synchronisation |
 |---|---|---|
-| Dispatcher | 1 (reads central queue) | none — atomic routing table load |
 | Worker | 1 per type (reads per-type queue) | none — single consumer |
 | FileWriter / BlobWriter flush loop | 1 per type | `sync.Mutex` shared with `Add` |
 | Routing table updates | atomic | `atomic.Pointer[RoutingTable]` copy-on-write |
@@ -116,8 +108,7 @@ ingest endpoint
 cancel()          // signals ctx.Done() to all goroutines
 
 wg.Wait()         // blocks until:
-                  //   dispatcher exits
-                  //   each Worker exits
+                  //   each Worker drains its queue and exits
                   //   each writer flush loop does a final flush and exits
 ```
 

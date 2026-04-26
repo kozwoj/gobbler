@@ -78,7 +78,6 @@ type Config struct {
     OutputDir        string      // file mode only
     AccountName      string      // blob mode only
     AccountKey       string      // blob mode only
-    CentralQueueSize int
     WorkerQueueSize  int
     BatchSize        int
 }

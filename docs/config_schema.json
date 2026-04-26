@@ -1,0 +1,13 @@
+{
+  "title": "gobblerConfigurationSchema",
+  "description": "describes storage mode and other pipeline properties",
+  "type": "object",
+  "properties": {
+    "mode": {"type": "string", "optional": false},
+    "outputDir": {"type": "string", "optional": true},
+    "accountName": {"type": "string", "optional": true},
+    "accountKey": {"type": "string", "optional": true},
+    "workerQueueSize": {"type": "integer", "optional": false},
+    "batchSize": {"type": "integer", "optional": false}
+  }
+}
