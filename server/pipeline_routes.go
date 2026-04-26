@@ -116,8 +116,6 @@ func (s *Server) handlePipelineStart(w http.ResponseWriter, r *http.Request) {
 	s.pipelineCtx = ctx
 	s.cancel = cancel
 
-	pipeline.Start(ctx, &s.wg, s.config.CentralQueueSize)
-
 	for _, def := range s.definitions {
 		if err := s.startType(def); err != nil {
 			// Roll back: cancel all goroutines started so far, then reset.

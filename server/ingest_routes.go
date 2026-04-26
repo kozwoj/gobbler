@@ -73,13 +73,21 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if !pipeline.Enqueue(pipeline.CSVitem{
-			Type: pipeline.ItemType(item.ItemTypeName),
-			CSV:  csvStr,
-		}) {
+		desc := pipeline.LookupType(pipeline.ItemType(item.ItemTypeName))
+		if desc == nil {
 			rejected = append(rejected, map[string]interface{}{
 				"typeName": item.ItemTypeName,
-				"error":    "pipeline queue full",
+				"error":    "type not registered",
+			})
+			continue
+		}
+		select {
+		case desc.Queue <- pipeline.CSVitem{Type: pipeline.ItemType(item.ItemTypeName), CSV: csvStr}:
+			// delivered directly to writer's worker queue
+		default:
+			rejected = append(rejected, map[string]interface{}{
+				"typeName": item.ItemTypeName,
+				"error":    "worker queue full",
 			})
 			continue
 		}
