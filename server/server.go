@@ -17,6 +17,7 @@ type Writer interface {
 	Start(ctx context.Context, wg *sync.WaitGroup)
 	Add(item pipeline.CSVitem)
 	Rotate()
+	Stats() writers.WriterStats
 }
 
 // typeEntry bundles the live components for a single registered item type
@@ -82,8 +83,8 @@ func (s *Server) Config() (pipeline.Config, bool) {
 }
 
 // startType creates and starts the writer and worker goroutines for def.
-// Must be called with s.mu write-locked and only while the pipeline is running
-// (i.e. s.pipelineCtx is set).
+// Must be called with s.mu write-locked and only after s.pipelineCtx has been set
+// (which happens in handlePipelineStart before the startType loop, independently of s.running).
 func (s *Server) startType(def items.ItemDefinition) error {
 	ctx, cancel := context.WithCancel(s.pipelineCtx)
 	entry := &typeEntry{cancel: cancel}
@@ -114,7 +115,7 @@ func (s *Server) startType(def items.ItemDefinition) error {
 	entry.writer = w
 
 	w.Start(ctx, &entry.wg)
-	worker := pipeline.NewWorker[pipeline.CSVitem](ctx, &entry.wg, s.config.WorkerQueueSize, w.Add)
+	worker := pipeline.NewWorker(ctx, &entry.wg, s.config.WorkerQueueSize, w.Add)
 
 	s.types[pipeline.ItemType(def.TypeName)] = entry
 	pipeline.AddItemType(pipeline.ItemType(def.TypeName), &pipeline.TypeDescriptor{

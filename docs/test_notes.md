@@ -2,20 +2,16 @@
 
 This note records the agreed test scenarios and approach for validating the route handler implementations described in `docs/implementation_notes.md`.
 
-**Status: proposed — not yet implemented.**
+**Status: approach decided — implementation not yet started.**
 
 ---
 
-## Approach options (not yet decided)
-
-**Option 1 — `.http` file (VS Code REST Client)**
-Update/replace `tester/docs/REST_boudaryServicet.http` with requests matching the current routes and the scenarios below. Manual execution; results are eyeballed.
+## Approach
 
 **Option 2 — Go `httptest` unit tests in `server/`**
-Table-driven tests using `net/http/httptest` and `httptest.NewRecorder`. No live server needed for most scenarios; file-mode tests write to a temp dir. Assertions are in code.
+Table-driven tests using `net/http/httptest` and `httptest.NewRecorder`. Tests live in `server/server_test.go`. No live server or open ports needed. File-mode tests write to a `t.TempDir()`. Each test that exercises start/stop calls `t.Cleanup(pipeline.Reset)` to prevent package-level state leaking between tests. Runnable with `go test ./server/...` and in CI.
 
-**Option 3 — Both**
-`.http` for exploratory/smoke testing; `httptest` tests for the repeatable regression suite.
+**Option 3 — Live server integration tests** is deferred for later performance and throughput testing.
 
 ---
 
@@ -50,10 +46,12 @@ Table-driven tests using `net/http/httptest` and `httptest.NewRecorder`. No live
 | C3 | Add `beta` definition | 200 |
 | C4 | `GET /gobbler/definition/list` | Array containing `alpha` and `beta` |
 | C5 | `POST /gobbler/pipeline/start` | 200; output subdirectories created on disk |
-| C6 | `GET /gobbler/pipeline/status` | `running: true`, `activeTypes: [alpha, beta]` |
-| C7 | Ingest a batch of valid `alpha` and `beta` items | `{"ingested": N, "rejected": []}` |
-| C8 | Wait, then check output dir | CSV file(s) present under `outputDir/alphaFolder` and `outputDir/bettaFolder` |
-| C9 | `POST /gobbler/pipeline/stop` | 200; files flushed and closed |
+| C6 | `GET /gobbler/pipeline/status` immediately after start | `running: true`; `types` map contains entries for `alpha` and `beta`; both show `itemsInBuffer: 0`, `itemsWritten: 0`, `lastFlush` zero, `currentOutput: ""` |
+| C7 | Ingest N valid `alpha` items and M valid `beta` items | `{"ingested": N+M, "rejected": []}` |
+| C8 | `GET /gobbler/pipeline/status` after short wait (flush tick) | `alpha.itemsWritten == N`, `beta.itemsWritten == M`, `lastFlush` non-zero, `currentOutput` non-empty for both |
+| C9 | Check output dir on disk | CSV files present under `outputDir/alphaFolder` and `outputDir/bettaFolder` |
+| C10 | `POST /gobbler/pipeline/stop` | 200; files flushed and closed |
+| C11 | `GET /gobbler/pipeline/status` after stop | `running: false`, `configured: true`, `types` key absent |
 
 ### Category D — Ingest error handling
 
@@ -69,19 +67,19 @@ Table-driven tests using `net/http/httptest` and `httptest.NewRecorder`. No live
 
 | # | Call | Expected |
 |---|---|---|
-| E1 | Start pipeline with only `alpha` registered | Running with 1 active type |
-| E2 | `POST /gobbler/definition/add` with `gamma` | 200; `gamma` appears in `status.activeTypes` |
-| E3 | Ingest `gamma` items | Written to disk |
-| E4 | `POST /gobbler/definition/remove` `{"typeName": "gamma"}` | 200; `gamma` gone from `activeTypes`; file flushed |
+| E1 | Start pipeline with only `alpha` registered | Running; `writers` map has only `alpha` entry |
+| E2 | `POST /gobbler/definition/add` with `gamma` | 200; `status.types` now contains `gamma` with zeroed stats |
+| E3 | Ingest N `gamma` items | `ingested: N`; after flush tick `gamma.itemsWritten == N` in status |
+| E4 | `POST /gobbler/definition/remove` `{"typeName": "gamma"}` | 200; `gamma` gone from `status.writers`; its file flushed on disk |
 | E5 | Ingest `gamma` items again | All appear in `rejected` (unknown type) |
 
 ### Category F — Rotate
 
 | # | Call | Expected |
 |---|---|---|
-| F1 | Ingest some `alpha` items (below batch threshold) | Buffer partially filled |
-| F2 | `POST /gobbler/pipeline/rotate` `{"typeName": "alpha"}` | 200; current file closed |
-| F3 | Ingest more `alpha` items | Written to a new timestamped file |
+| F1 | Ingest some `alpha` items (below batch threshold) | `status` shows `alpha.itemsInBuffer > 0`, `currentOutput: ""` (no flush yet) |
+| F2 | `POST /gobbler/pipeline/rotate` `{"typeName": "alpha"}` | 200; `status` shows `alpha.itemsInBuffer: 0`, `itemsWritten > 0`, `currentOutput: ""` (file closed after rotate) |
+| F3 | Ingest more `alpha` items then wait for flush tick | A second timestamped CSV file appears in `outputDir/alphaFolder` |
 
 ### Category G — Lifecycle edge cases
 
@@ -93,6 +91,18 @@ Table-driven tests using `net/http/httptest` and `httptest.NewRecorder`. No live
 | G4 | `POST /gobbler/definition/add` with duplicate name | 409 |
 | G5 | `POST /gobbler/definition/remove` with non-existent name | 404 |
 | G6 | Stop → reconfigure with different `outputDir` → re-add definitions → start | 200 at each step; writes go to new dir |
+| G7 | `GET /gobbler/pipeline/status` after stop | `running: false`; `types` key absent from response |
+
+### Category H — Writer stats accuracy
+
+These tests verify that `status.types[T].itemsWritten` matches the count returned by the ingest endpoint.
+
+| # | Steps | Expected |
+|---|---|---|
+| H1 | Ingest exactly 10 `alpha` items (batch size > 10); wait for flush tick; check status | `alpha.itemsWritten == 10` |
+| H2 | Ingest another 15 `alpha` items; wait; check status | `alpha.itemsWritten == 25` (cumulative) |
+| H3 | Ingest a mixed batch of 5 valid `alpha` + 3 invalid items; check ingest response and then status | `ingested == 5`, `rejected` len == 3; `alpha.itemsWritten` increased by exactly 5 after flush |
+| H4 | Ingest exactly `batchSize` items in one call | Immediate flush triggered (no tick needed); `itemsInBuffer == 0` and `itemsWritten == batchSize` visible in next status call |
 
 ---
 

@@ -26,16 +26,19 @@ func (r readSeekCloser) Close() error { return nil }
 // in an Azure Blob Storage container. The container name equals def.Folder.
 // Blobs rotate when their age exceeds the item's Latency.
 type BlobWriter struct {
-	buffer      []string
-	container   string
-	accountName string
-	cred        *azblob.SharedKeyCredential
-	blobClient  *appendblob.Client
-	blobStart   time.Time
-	batchSize   int
-	maxAge      time.Duration
-	typeName    string
-	mu          sync.Mutex
+	buffer       []string
+	container    string
+	accountName  string
+	cred         *azblob.SharedKeyCredential
+	blobClient   *appendblob.Client
+	blobStart    time.Time
+	batchSize    int
+	maxAge       time.Duration
+	typeName     string
+	itemsWritten int64
+	lastFlush    time.Time
+	currentBlob  string
+	mu           sync.Mutex
 }
 
 // NewBlobWriter creates a BlobWriter for the given definition and blob credentials.
@@ -109,6 +112,18 @@ func (w *BlobWriter) Add(item pipeline.CSVitem) {
 	}
 }
 
+// Stats returns a point-in-time snapshot of the writer's operational state.
+func (w *BlobWriter) Stats() WriterStats {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return WriterStats{
+		ItemsInBuffer: len(w.buffer),
+		ItemsWritten:  w.itemsWritten,
+		LastFlush:     w.lastFlush,
+		CurrentOutput: w.currentBlob,
+	}
+}
+
 // Rotate forces an immediate flush of the current blob and ensures the next write
 // goes to a new timestamped blob. Safe to call from the management REST endpoint.
 func (w *BlobWriter) Rotate() {
@@ -120,11 +135,14 @@ func (w *BlobWriter) Rotate() {
 			fmt.Println("writers: BlobWriter: Rotate: append:", err)
 			return
 		}
+		w.itemsWritten += int64(len(w.buffer))
+		w.lastFlush = time.Now()
 		w.buffer = nil
 	}
 	// Nil the client so flush creates a new blob on the next write.
 	w.blobClient = nil
 	w.blobStart = time.Time{}
+	w.currentBlob = ""
 }
 
 // flush writes buffered lines to the current append blob, rotating to a new blob
@@ -137,7 +155,7 @@ func (w *BlobWriter) flush() {
 	rotate := w.blobClient == nil || time.Since(w.blobStart) >= w.maxAge
 	if rotate {
 		w.blobStart = time.Now()
-		blobName := fmt.Sprintf("%s_%s", w.blobStart.Format("2006-01-02_15-04-05"), w.typeName)
+		blobName := fmt.Sprintf("%s_%s", w.blobStart.Format("2006-01-02_15-04-05.000"), w.typeName)
 		blobURL := fmt.Sprintf("https://%s.blob.core.windows.net/%s/%s",
 			w.accountName, w.container, blobName)
 		client, err := appendblob.NewClientWithSharedKeyCredential(blobURL, w.cred, nil)
@@ -152,6 +170,7 @@ func (w *BlobWriter) flush() {
 			return
 		}
 		w.blobClient = client
+		w.currentBlob = blobName
 	}
 	payload := strings.Join(w.buffer, "\n") + "\n"
 	if _, err := w.blobClient.AppendBlock(ctx, readSeekCloser{strings.NewReader(payload)}, nil); err != nil {
@@ -159,5 +178,7 @@ func (w *BlobWriter) flush() {
 		fmt.Println("writers: BlobWriter: append:", err)
 		return
 	}
+	w.itemsWritten += int64(len(w.buffer))
+	w.lastFlush = time.Now()
 	w.buffer = nil
 }

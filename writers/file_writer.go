@@ -19,14 +19,16 @@ const defaultMaxAge = 60 * time.Minute
 // FileWriter accumulates CSVitems in a buffer and flushes them to timestamped CSV
 // files under a local directory. Files rotate when their age exceeds the item's Latency.
 type FileWriter struct {
-	buffer    []string
-	file      *os.File
-	outputDir string
-	fileStart time.Time
-	batchSize int
-	maxAge    time.Duration
-	typeName  string
-	mu        sync.Mutex
+	buffer       []string
+	file         *os.File
+	outputDir    string
+	fileStart    time.Time
+	batchSize    int
+	maxAge       time.Duration
+	typeName     string
+	itemsWritten int64
+	lastFlush    time.Time
+	mu           sync.Mutex
 }
 
 // NewFileWriter creates a FileWriter for the given definition rooted at rootDir.
@@ -88,6 +90,22 @@ func (w *FileWriter) Add(item pipeline.CSVitem) {
 	}
 }
 
+// Stats returns a point-in-time snapshot of the writer's operational state.
+func (w *FileWriter) Stats() WriterStats {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	currentOutput := ""
+	if w.file != nil {
+		currentOutput = w.file.Name()
+	}
+	return WriterStats{
+		ItemsInBuffer: len(w.buffer),
+		ItemsWritten:  w.itemsWritten,
+		LastFlush:     w.lastFlush,
+		CurrentOutput: currentOutput,
+	}
+}
+
 // Rotate forces an immediate close of the current file and ensures the next write
 // goes to a new timestamped file. Safe to call from the management REST endpoint.
 func (w *FileWriter) Rotate() {
@@ -97,7 +115,7 @@ func (w *FileWriter) Rotate() {
 		// Write buffered lines to the current file before closing it.
 		if w.file == nil {
 			// No file open yet; open one now so buffered data is not lost.
-			fname := fmt.Sprintf("%s_%s.csv", time.Now().Format("2006-01-02_15-04-05"), w.typeName)
+			fname := fmt.Sprintf("%s_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"), w.typeName)
 			f, err := os.OpenFile(filepath.Join(w.outputDir, fname), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 			if err != nil {
 				fmt.Println("writers: FileWriter: Rotate: open file:", err)
@@ -109,6 +127,8 @@ func (w *FileWriter) Rotate() {
 			fmt.Println("writers: FileWriter: Rotate: write:", err)
 			return
 		}
+		w.itemsWritten += int64(len(w.buffer))
+		w.lastFlush = time.Now()
 		w.buffer = nil
 	}
 	if w.file != nil {
@@ -130,7 +150,7 @@ func (w *FileWriter) flush() {
 			w.file.Close()
 			w.file = nil
 		}
-		fname := fmt.Sprintf("%s_%s.csv", time.Now().Format("2006-01-02_15-04-05"), w.typeName)
+		fname := fmt.Sprintf("%s_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"), w.typeName)
 		f, err := os.OpenFile(filepath.Join(w.outputDir, fname), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			// TODO: replace with structured logging
@@ -145,5 +165,7 @@ func (w *FileWriter) flush() {
 		fmt.Println("writers: FileWriter: write:", err)
 		return
 	}
+	w.itemsWritten += int64(len(w.buffer))
+	w.lastFlush = time.Now()
 	w.buffer = nil
 }

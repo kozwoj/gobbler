@@ -213,11 +213,17 @@ func (s *Server) handlePipelineStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.running {
-		typeNames := make([]string, 0, len(s.types))
-		for t := range s.types {
-			typeNames = append(typeNames, string(t))
+		typeStats := make(map[string]interface{}, len(s.types))
+		for t, entry := range s.types {
+			st := entry.writer.Stats()
+			typeStats[string(t)] = map[string]interface{}{
+				"itemsInBuffer": st.ItemsInBuffer,
+				"itemsWritten":  st.ItemsWritten,
+				"lastFlush":     st.LastFlush,
+				"currentOutput": st.CurrentOutput,
+			}
 		}
-		status["activeTypes"] = typeNames
+		status["writers"] = typeStats
 	}
 
 	sendJSON(w, status)
