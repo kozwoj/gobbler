@@ -4,14 +4,14 @@
 GET http://localhost:3000/gobbler/definition/list
 Authorization: Bearer abc123==
 
-//------------------- vmReboot -------------------
+//------------------- vm-reboot -------------------
 ###
 POST http://localhost:3000/gobbler/definition/add
 Authorization: Bearer abc123==
 Content-Type: application/json
 
 {
-	"name": "vmReboot",
+	"name": "vm-reboot",
 	"documentation": "virtual machine reboot event",
 	"folder": "administration",
 	"latencyMinutes": 10,
@@ -34,17 +34,17 @@ POST http://localhost:3000/gobbler/definition/remove
 Authorization: Bearer abc123==
 Content-Type: application/json
 
-{ "typeName": "vmReboot" }
+{ "typeName": "vm-reboot" }
 
 
-//------------------- vmShutdown ------------------- 
+//------------------- vm-shutdown ------------------- 
 ###
 POST http://localhost:3000/gobbler/definition/add
 Authorization: Bearer abc123==
 Content-Type: application/json
 
 {
-	"name": "vmShutdown",
+	"name": "vm-shutdown",
 	"documentation": "virtual machine shutdown event",
 	"folder": "administration",
 	"latencyMinutes": 10,
@@ -64,7 +64,7 @@ POST http://localhost:3000/gobbler/definition/remove
 Authorization: Bearer abc123==
 Content-Type: application/json
 
-{ "typeName": "vmShutdown" }
+{ "typeName": "vm-shutdown" }
 
 
 // ------------------- allscalars -------------------
@@ -76,7 +76,7 @@ Content-Type: application/json
 {
 	"name": "allscalars",
 	"documentation": "table with all scalar types",
-	"folder": "folderOne",
+	"folder": "folder-one",
 	"latencyMinutes": 10,
 	"orderedColumns": [
 		{"name": "_string", "type": "string", "defaultValue": "value", "optional": true},
@@ -121,8 +121,8 @@ Authorization: Bearer abc123==
 Content-Type: application/json
 
 [
-    { "vmShutdown": { "vmId": "vm_87345882", "shutdownStart": "2018-05-01 01:40:42.902", "shutdownReason": "OS update" } },
-    { "vmShutdown": { "vmId": "vm_76445833", "shutdownStart": "2018-05-01 01:40:44.424", "shutdownReason": "Live migration" }}
+    { "vm-shutdown": { "vmId": "vm_87345882", "shutdownStart": "2018-05-01 01:40:42.902", "shutdownReason": "OS update" } },
+    { "vm-shutdown": { "vmId": "vm_76445833", "shutdownStart": "2018-05-01 01:40:44.424", "shutdownReason": "Live migration" }}
 ]
 
 ###
@@ -156,7 +156,7 @@ Content-Type: application/json
 {
     "name": "somescalars",
     "documentation": "table One",
-    "folder": "myFolder",
+    "folder": "my-folder",
     "latencyMinutes": 10,
     "orderedColumns": [
         { "name": "_string", "type": "string", "defaultValue": "value" },

@@ -2,61 +2,35 @@ package server
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/kozwoj/gobbler/pipeline"
 	"github.com/kozwoj/gobbler/tester"
 )
 
-const gammaDef = `{
-	"name": "gamma",
-	"documentation": "test definition gamma with int, string, and dynamic types",
-	"folder": "gamma-folder",
-	"latencyMinutes": 3,
-	"orderedColumns": [
-		{"name": "gammaInt",     "type": "int"},
-		{"name": "gammaStr",     "type": "string"},
-		{"name": "gammaDynamic", "type": "dynamic"}
-	]
-}`
-
-// waitForWritten polls the status endpoint until the named writer reports at
-// least wantWritten items written, or the 2-second deadline is exceeded.
-// Returns the final itemsWritten value observed.
-func waitForWritten(t *testing.T, router http.Handler, typeName string, wantWritten float64) float64 {
-	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	var got float64
-	for time.Now().Before(deadline) {
-		time.Sleep(100 * time.Millisecond)
-		w := do(t, router, http.MethodGet, "/gobbler/pipeline/status", "")
-		body := decodeJSON(t, w)
-		writers, _ := body["writers"].(map[string]interface{})
-		entry, _ := writers[typeName].(map[string]interface{})
-		got, _ = entry["itemsWritten"].(float64)
-		if got >= wantWritten {
-			return got
-		}
-	}
-	return got
-}
-
-// ---- Category E: Hot-add and hot-remove while running ----
-
-// TestE_HotAddRemove runs E1–E5 as a single ordered test.
-func TestE_HotAddRemove(t *testing.T) {
+// TestBlobE_HotAddRemove mirrors TestE_HotAddRemove for blob mode.
+// E1–E3: start with alpha only, hot-add gamma, ingest gamma items and wait for flush.
+// E4: hot-remove gamma — verifies the blob was flushed to Azure on shutdown.
+// E5 (ingest after remove is rejected) is mode-independent and covered by the file tests.
+// Skipped if ../tester/secrets.json is absent.
+func TestBlobE_HotAddRemove(t *testing.T) {
+	sec := loadBlobSecrets(t)
 	t.Cleanup(pipeline.Reset)
-	outputDir := t.TempDir()
+
+	alphaContainer := newBlobContainer("alpha")
+	gammaContainer := newBlobContainer("gamma")
+	t.Cleanup(func() {
+		deleteContainer(sec, alphaContainer)
+		deleteContainer(sec, gammaContainer)
+	})
+
 	s := New()
 	router := newTestRouter(s)
 
 	// E1 — start with only alpha; writers map must have exactly alpha.
 	t.Run("E1_StartAlphaOnly", func(t *testing.T) {
-		configureFileMode(t, router, outputDir)
-		if w := do(t, router, http.MethodPost, "/gobbler/definition/add", alphaDef); w.Code != http.StatusOK {
+		configureBlobMode(t, router, sec)
+		if w := do(t, router, http.MethodPost, "/gobbler/definition/add", blobAlphaDef(alphaContainer)); w.Code != http.StatusOK {
 			t.Fatalf("add alpha: %d %s", w.Code, w.Body.String())
 		}
 		if w := do(t, router, http.MethodPost, "/gobbler/pipeline/start", ""); w.Code != http.StatusOK {
@@ -67,7 +41,7 @@ func TestE_HotAddRemove(t *testing.T) {
 		body := decodeJSON(t, w)
 		writers, ok := body["writers"].(map[string]interface{})
 		if !ok {
-			t.Fatalf("expected writers map in status, got %T", body["writers"])
+			t.Fatalf("expected writers map in status")
 		}
 		if _, hasAlpha := writers["alpha"]; !hasAlpha {
 			t.Errorf("expected alpha in writers map")
@@ -79,7 +53,7 @@ func TestE_HotAddRemove(t *testing.T) {
 
 	// E2 — hot-add gamma while running; status must include gamma with zeroed stats.
 	t.Run("E2_HotAddGamma", func(t *testing.T) {
-		if w := do(t, router, http.MethodPost, "/gobbler/definition/add", gammaDef); w.Code != http.StatusOK {
+		if w := do(t, router, http.MethodPost, "/gobbler/definition/add", blobGammaDef(gammaContainer)); w.Code != http.StatusOK {
 			t.Fatalf("hot-add gamma: %d %s", w.Code, w.Body.String())
 		}
 
@@ -87,7 +61,7 @@ func TestE_HotAddRemove(t *testing.T) {
 		body := decodeJSON(t, w)
 		writers, ok := body["writers"].(map[string]interface{})
 		if !ok {
-			t.Fatalf("expected writers map after hot-add, got %T", body["writers"])
+			t.Fatalf("expected writers map after hot-add")
 		}
 		gammaEntry, ok := writers["gamma"].(map[string]interface{})
 		if !ok {
@@ -117,13 +91,15 @@ func TestE_HotAddRemove(t *testing.T) {
 			t.Errorf("expected ingested=%d, got %v", gammaCount, body["ingested"])
 		}
 
+		// waitForWritten polls the status endpoint (defined in server_E_test.go).
 		written := waitForWritten(t, router, "gamma", gammaCount)
 		if written != float64(gammaCount) {
 			t.Errorf("expected gamma.itemsWritten=%d after flush, got %v", gammaCount, written)
 		}
 	})
 
-	// E4 — hot-remove gamma; it must disappear from status writers and its file must be flushed.
+	// E4 — hot-remove gamma; it must disappear from status writers and its blob must
+	// be flushed to Azure (cancel+Wait triggers the shutdown flush in BlobWriter).
 	t.Run("E4_HotRemoveGamma", func(t *testing.T) {
 		if w := do(t, router, http.MethodPost, "/gobbler/definition/remove", `{"typeName":"gamma"}`); w.Code != http.StatusOK {
 			t.Fatalf("hot-remove gamma: %d %s", w.Code, w.Body.String())
@@ -137,36 +113,13 @@ func TestE_HotAddRemove(t *testing.T) {
 			t.Errorf("gamma should be gone from writers after hot-remove")
 		}
 
-		// gamma's file must be on disk (flushed and closed by cancel+Wait).
-		entries, err := os.ReadDir(filepath.Join(outputDir, "gamma-folder"))
-		if err != nil {
-			t.Fatalf("could not read gamma-folder: %v", err)
-		}
-		if len(entries) == 0 {
-			t.Errorf("expected gamma CSV file on disk after hot-remove, found none")
+		// gamma's blob must exist in Azure (flushed by BlobWriter shutdown).
+		count := waitForBlobCount(t, sec, gammaContainer, 1)
+		if count == 0 {
+			t.Errorf("expected gamma blob in Azure container %q after hot-remove, found none", gammaContainer)
 		}
 	})
 
-	// E5 — ingesting gamma after removal lands everything in rejected.
-	t.Run("E5_IngestAfterRemove", func(t *testing.T) {
-		gammaArray, err := tester.NewGammaGenerator().GenerateJSONArray(1)
-		if err != nil {
-			t.Fatalf("generate gamma: %v", err)
-		}
-		w := do(t, router, http.MethodPost, "/gobbler/ingest", gammaArray)
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-		}
-		body := decodeJSON(t, w)
-		if body["ingested"] != float64(0) {
-			t.Errorf("expected ingested=0 after remove, got %v", body["ingested"])
-		}
-		rejected, _ := body["rejected"].([]interface{})
-		if len(rejected) != 1 {
-			t.Errorf("expected 1 rejected entry, got %d", len(rejected))
-		}
-	})
-
-	// cleanup — stop the pipeline so writers are closed before t.TempDir is removed.
+	// cleanup — stop the pipeline so remaining writers (alpha) are closed.
 	do(t, router, http.MethodPost, "/gobbler/pipeline/stop", "")
 }

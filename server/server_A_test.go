@@ -93,7 +93,7 @@ func TestA3_AddDefinitionBeforeStart(t *testing.T) {
 	alphaDef := `{
 		"name": "alpha",
 		"documentation": "test definition alpha with string, int and datetime types",
-		"folder": "alphaFolder",
+		"folder": "alpha-folder",
 		"latencyMinutes": 1,
 		"orderedColumns": [
 			{"name": "alphaStr",  "type": "string"},
@@ -130,7 +130,7 @@ func TestA4_StartWithDefinitionButNoConfig(t *testing.T) {
 	alphaDef := `{
 		"name": "alpha",
 		"documentation": "test definition alpha with string, int and datetime types",
-		"folder": "alphaFolder",
+		"folder": "alpha-folder",
 		"latencyMinutes": 1,
 		"orderedColumns": [
 			{"name": "alphaStr",  "type": "string"},

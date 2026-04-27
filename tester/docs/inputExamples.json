@@ -1,8 +1,8 @@
 [
 	[
 		{"allscalars": {"_string": "Hyundai", "_boolean": true, "_datetime": "2023-10-01 12:00:00", "_dynamic": "{\"color\":\"Crimson\",\"size\":\"small\"}", "_int": 0, "_real": 12537.5948, "_timespan": "7d"}},
-		{"vmShutdown": {"vmId": "vm_87345882", "shutdownStart": "2023-10-01 12:00:00.125", "shutdownReason": "OS update"}},
-		{"vmReboot": {"vmId": "vm_87345882", "eventTime": "2023-10-01 12:00:00.125", "rebootStart": "2023-10-01 11:00:00", "rebootDurationSec": "120s", "rebootReason": "OS update", "OS": "{\"os\": \"Windows\", \"version\": \"11\"}"}},
+		{"vm-shutdown": {"vmId": "vm_87345882", "shutdownStart": "2023-10-01 12:00:00.125", "shutdownReason": "OS update"}},
+		{"vm-reboot": {"vmId": "vm_87345882", "eventTime": "2023-10-01 12:00:00.125", "rebootStart": "2023-10-01 11:00:00", "rebootDurationSec": "120s", "rebootReason": "OS update", "OS": "{\"os\": \"Windows\", \"version\": \"11\"}"}},
 		{"somescalars": { "_string": "Hyundaiii", "_boolean": true, "_datetime": "2018-05-01 01:40:42.902", "_int": 0, "_real": 12537.5948 }}
 	],
 	

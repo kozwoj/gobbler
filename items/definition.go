@@ -93,11 +93,8 @@ func CreateItemDefinition(def string, itemDef *ItemDefinition) error {
 	}
 	// check if definition contains optional folder field of type string, and if it is missing set it to the value of the name field
 	if folder, ok := m["folder"].(string); ok {
-		// check if the folder is a valid file name and meets the minimum length of 3
+		// check if the folder is a valid Azure container name
 		if err := CheckFileName(folder); err == nil {
-			if len(folder) < 3 {
-				return NewDefinitionError("folder", folder, ErrFolderTooShort)
-			}
 			itemDef.Folder = folder
 		} else {
 			return NewDefinitionError("folder", folder, ErrInvalidFolderField)
@@ -326,24 +323,41 @@ func CheckTimeSpan(timeSpan string) error {
 }
 
 /*
-Both item name and folder name are used to create directory/container and file/blob names, so they should
-- start with character, and
-- not contain the following characters { "/","\",":","*","?"," ","<",">","|" }
+Both item name and folder name are used as Azure blob container names and local directory/file names,
+so they must follow Azure container naming rules:
+- 3–63 characters
+- only lowercase letters (a–z), digits (0–9), and hyphens
+- must start and end with a letter or digit
+- no consecutive hyphens
 */
 func CheckFileName(fileName string) error {
 	// check if the fileName string is empty
 	if fileName == "" {
 		return NewValidationError("filename", "fileName", fileName, ErrEmptyFileName)
 	}
-	// check if fileName string starts with a character (a-z, A-Z)
-	if (fileName[0] < 'a' || fileName[0] > 'z') && (fileName[0] < 'A' || fileName[0] > 'Z') {
-		return NewValidationError("filename", "fileName", fileName, fmt.Errorf("%w: must start with a character", ErrInvalidFileName))
+	// Azure container naming: 3–63 characters
+	if len(fileName) < 3 || len(fileName) > 63 {
+		return NewValidationError("filename", "fileName", fileName, fmt.Errorf("%w: must be 3–63 characters", ErrInvalidFileName))
 	}
-	// check if fileName string contains any of the invalid characters
-	for _, c := range fileName {
-		if c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == ' ' || c == '<' || c == '>' || c == '|' {
+	// must start with a lowercase letter or digit
+	first := fileName[0]
+	if !((first >= 'a' && first <= 'z') || (first >= '0' && first <= '9')) {
+		return NewValidationError("filename", "fileName", fileName, fmt.Errorf("%w: must start with a lowercase letter or digit", ErrInvalidFileName))
+	}
+	// must end with a lowercase letter or digit (no trailing hyphen)
+	last := fileName[len(fileName)-1]
+	if !((last >= 'a' && last <= 'z') || (last >= '0' && last <= '9')) {
+		return NewValidationError("filename", "fileName", fileName, fmt.Errorf("%w: must end with a letter or digit", ErrInvalidFileName))
+	}
+	// only lowercase letters, digits, and hyphens; no consecutive hyphens
+	for i := 0; i < len(fileName); i++ {
+		c := fileName[i]
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
 			return NewValidationError("filename", "fileName", fileName, fmt.Errorf("%w: contains invalid character %c", ErrInvalidFileName, c))
 		}
+		if c == '-' && i > 0 && fileName[i-1] == '-' {
+			return NewValidationError("filename", "fileName", fileName, fmt.Errorf("%w: contains consecutive hyphens", ErrInvalidFileName))
+		}
 	}
-	return nil // valid fileName format
+	return nil // valid name
 }

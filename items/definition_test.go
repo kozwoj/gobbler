@@ -34,7 +34,7 @@ func TestValidDefinition_AllScalars(t *testing.T) {
 	json := `{
 		"name": "allscalars",
 		"documentation": "table with all scalar types",
-		"folder": "folderOne",
+		"folder": "folder-one",
 		"latencyMinutes": 10,
 		"orderedColumns": [
 			{"name": "_string",   "type": "string",   "defaultValue": "value", "optional": true},
@@ -51,8 +51,8 @@ func TestValidDefinition_AllScalars(t *testing.T) {
 	if def.TypeName != "allscalars" {
 		t.Errorf("TypeName: got %q, want %q", def.TypeName, "allscalars")
 	}
-	if def.Folder != "folderOne" {
-		t.Errorf("Folder: got %q, want %q", def.Folder, "folderOne")
+	if def.Folder != "folder-one" {
+		t.Errorf("Folder: got %q, want %q", def.Folder, "folder-one")
 	}
 	if def.Latency != 10 {
 		t.Errorf("Latency: got %d, want 10", def.Latency)
@@ -135,8 +135,8 @@ func TestError_ReservedName_Timestamp(t *testing.T) {
 	mustFail(t, `{"name": "timestamp", "orderedColumns": [{"name": "f1", "type": "string"}]}`, ErrReservedName)
 }
 
-func TestError_InvalidName_StartsWithDigit(t *testing.T) {
-	mustFail(t, `{"name": "1invalid", "orderedColumns": [{"name": "f1", "type": "string"}]}`, ErrInvalidFileName)
+func TestError_InvalidName_Uppercase(t *testing.T) {
+	mustFail(t, `{"name": "Invalid", "orderedColumns": [{"name": "f1", "type": "string"}]}`, ErrInvalidFileName)
 }
 
 func TestError_InvalidName_ContainsSpace(t *testing.T) {
@@ -146,7 +146,7 @@ func TestError_InvalidName_ContainsSpace(t *testing.T) {
 /* ============================= folder field errors ============================= */
 
 func TestError_FolderTooShort(t *testing.T) {
-	mustFail(t, `{"name": "mytype", "folder": "ab", "orderedColumns": [{"name": "f1", "type": "string"}]}`, ErrFolderTooShort)
+	mustFail(t, `{"name": "mytype", "folder": "ab", "orderedColumns": [{"name": "f1", "type": "string"}]}`, ErrInvalidFolderField)
 }
 
 func TestError_FolderInvalid(t *testing.T) {

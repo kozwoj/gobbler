@@ -3,8 +3,6 @@ package server
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,65 +10,31 @@ import (
 	"github.com/kozwoj/gobbler/tester"
 )
 
-// alphaDef and betaDef are the JSON item type definitions used across Category C tests.
-const alphaDef = `{
-	"name": "alpha",
-	"documentation": "test definition alpha with string, int and datetime types",
-	"folder": "alpha-folder",
-	"latencyMinutes": 1,
-	"orderedColumns": [
-		{"name": "alphaStr",  "type": "string"},
-		{"name": "alphaInt",  "type": "int"},
-		{"name": "alphaDate", "type": "datetime"}
-	]
-}`
-
-const betaDef = `{
-	"name": "beta",
-	"documentation": "test definition beta with string, bool and real types",
-	"folder": "beta-folder",
-	"latencyMinutes": 2,
-	"orderedColumns": [
-		{"name": "betaStr",  "type": "string"},
-		{"name": "betaBool", "type": "bool"},
-		{"name": "betaReal", "type": "real"}
-	]
-}`
-
-// configureFileMode posts a valid file-mode configure request using the given outputDir.
-func configureFileMode(t *testing.T, router http.Handler, outputDir string) {
-	t.Helper()
-	cfgBytes, _ := json.Marshal(map[string]interface{}{
-		"mode":            "file",
-		"outputDir":       outputDir,
-		"workerQueueSize": 200,
-		"batchSize":       50,
-	})
-	w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure", string(cfgBytes))
-	if w.Code != http.StatusOK {
-		t.Fatalf("configure failed: %d %s", w.Code, w.Body.String())
-	}
-}
-
-// ---- Category C: Happy path ----
-
-// TestC_HappyPath runs the full configure → add → start → ingest → stop → status cycle
-// as a single ordered test, mirroring the sequence in test_notes.md C1–C11.
-func TestC_HappyPath(t *testing.T) {
+// TestBlobC_HappyPath mirrors TestC_HappyPath for blob mode.
+// It runs the full configure → add → start → ingest → flush → verify blobs → stop cycle.
+// Skipped if ../tester/secrets.json is absent.
+func TestBlobC_HappyPath(t *testing.T) {
+	sec := loadBlobSecrets(t)
 	t.Cleanup(pipeline.Reset)
-	outputDir := t.TempDir()
+
+	alphaContainer := newBlobContainer("alpha")
+	betaContainer := newBlobContainer("beta")
+	t.Cleanup(func() {
+		deleteContainer(sec, alphaContainer)
+		deleteContainer(sec, betaContainer)
+	})
 
 	s := New()
 	router := newTestRouter(s)
 
-	// C1 — configure (file mode)
+	// C1 — configure (blob mode)
 	t.Run("C1_Configure", func(t *testing.T) {
-		configureFileMode(t, router, outputDir)
+		configureBlobMode(t, router, sec)
 	})
 
 	// C2 — add alpha definition
 	t.Run("C2_AddAlpha", func(t *testing.T) {
-		w := do(t, router, http.MethodPost, "/gobbler/definition/add", alphaDef)
+		w := do(t, router, http.MethodPost, "/gobbler/definition/add", blobAlphaDef(alphaContainer))
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 		}
@@ -78,13 +42,13 @@ func TestC_HappyPath(t *testing.T) {
 
 	// C3 — add beta definition
 	t.Run("C3_AddBeta", func(t *testing.T) {
-		w := do(t, router, http.MethodPost, "/gobbler/definition/add", betaDef)
+		w := do(t, router, http.MethodPost, "/gobbler/definition/add", blobBetaDef(betaContainer))
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 		}
 	})
 
-	// C4 — list definitions
+	// C4 — list definitions: must report 2
 	t.Run("C4_ListDefinitions", func(t *testing.T) {
 		w := do(t, router, http.MethodGet, "/gobbler/definition/list", "")
 		if w.Code != http.StatusOK {
@@ -99,31 +63,24 @@ func TestC_HappyPath(t *testing.T) {
 		}
 	})
 
-	// C5 — start pipeline; output subdirectories must be created
+	// C5 — start pipeline; NewBlobWriter creates the Azure containers
 	t.Run("C5_Start", func(t *testing.T) {
 		w := do(t, router, http.MethodPost, "/gobbler/pipeline/start", "")
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 		}
-		for _, folder := range []string{"alpha-folder", "beta-folder"} {
-			if _, err := os.Stat(filepath.Join(outputDir, folder)); os.IsNotExist(err) {
-				t.Errorf("expected output subdirectory %s to exist after start", folder)
-			}
-		}
 	})
 
-	// C6 — status immediately after start: running=true, types map present with zeroed stats
+	// C6 — status immediately after start: running=true, writers map with zeroed stats
 	t.Run("C6_StatusAfterStart", func(t *testing.T) {
 		w := do(t, router, http.MethodGet, "/gobbler/pipeline/status", "")
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 		}
 		body := decodeJSON(t, w)
-
 		if body["running"] != true {
 			t.Errorf("expected running=true, got %v", body["running"])
 		}
-
 		writers, ok := body["writers"].(map[string]interface{})
 		if !ok {
 			t.Fatalf("expected writers map in status, got %T: %v", body["writers"], body["writers"])
@@ -131,7 +88,7 @@ func TestC_HappyPath(t *testing.T) {
 		for _, typeName := range []string{"alpha", "beta"} {
 			entry, ok := writers[typeName].(map[string]interface{})
 			if !ok {
-				t.Fatalf("expected writers[%s] to be a map, got %T", typeName, writers[typeName])
+				t.Fatalf("expected writers[%s] to be a map", typeName)
 			}
 			if entry["itemsInBuffer"] != float64(0) {
 				t.Errorf("%s: expected itemsInBuffer=0, got %v", typeName, entry["itemsInBuffer"])
@@ -157,7 +114,6 @@ func TestC_HappyPath(t *testing.T) {
 		if err != nil {
 			t.Fatalf("generate beta: %v", err)
 		}
-		// Merge into a single JSON array by stripping the outer brackets and rejoining.
 		batch := alphaArray[:len(alphaArray)-1] + "," + betaArray[1:]
 		w := do(t, router, http.MethodPost, "/gobbler/ingest", batch)
 		if w.Code != http.StatusOK {
@@ -173,12 +129,12 @@ func TestC_HappyPath(t *testing.T) {
 		}
 	})
 
-	// C8 — wait for flush tick (up to 2 s) then check itemsWritten in status
+	// C8 — wait for flush tick (up to 10 s for Azure) then check itemsWritten in status
 	t.Run("C8_StatsAfterFlush", func(t *testing.T) {
-		deadline := time.Now().Add(2 * time.Second)
+		deadline := time.Now().Add(10 * time.Second)
 		var alphaWritten, betaWritten float64
 		for time.Now().Before(deadline) {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(200 * time.Millisecond)
 			w := do(t, router, http.MethodGet, "/gobbler/pipeline/status", "")
 			body := decodeJSON(t, w)
 			writers, ok := body["writers"].(map[string]interface{})
@@ -201,15 +157,12 @@ func TestC_HappyPath(t *testing.T) {
 		}
 	})
 
-	// C9 — CSV files exist on disk
-	t.Run("C9_FilesOnDisk", func(t *testing.T) {
-		for _, folder := range []string{"alpha-folder", "beta-folder"} {
-			entries, err := os.ReadDir(filepath.Join(outputDir, folder))
-			if err != nil {
-				t.Fatalf("could not read output dir %s: %v", folder, err)
-			}
-			if len(entries) == 0 {
-				t.Errorf("expected at least one CSV file in %s, found none", folder)
+	// C9 — blobs exist in both Azure containers
+	t.Run("C9_BlobsInAzure", func(t *testing.T) {
+		for _, container := range []string{alphaContainer, betaContainer} {
+			count := countBlobsInContainer(t, sec, container)
+			if count == 0 {
+				t.Errorf("expected at least one blob in container %q, found none", container)
 			}
 		}
 	})
@@ -222,14 +175,13 @@ func TestC_HappyPath(t *testing.T) {
 		}
 	})
 
-	// C11 — status after stop: running=false, configured=true, no types key
+	// C11 — status after stop: running=false, configured=true, no writers key
 	t.Run("C11_StatusAfterStop", func(t *testing.T) {
 		w := do(t, router, http.MethodGet, "/gobbler/pipeline/status", "")
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 		}
 		body := decodeJSON(t, w)
-
 		if body["running"] != false {
 			t.Errorf("expected running=false after stop, got %v", body["running"])
 		}
@@ -237,7 +189,7 @@ func TestC_HappyPath(t *testing.T) {
 			t.Errorf("expected configured=true after stop, got %v", body["configured"])
 		}
 		if _, present := body["writers"]; present {
-			t.Errorf("expected writers key to be absent after stop, but it was present")
+			t.Errorf("expected writers key to be absent after stop")
 		}
 	})
 }

@@ -3,7 +3,7 @@
 	{
 		"name": "allscalars",
 		"documentation": "table with all scalar types",
-		"folder": "folderOne",
+		"folder": "folder-one",
 		"latencyMinutes": 10,
 		"orderedColumns": [
 			{
@@ -51,7 +51,7 @@
 	{
 		"name": "somescalars",
 		"documentation": "table with selected scalar types",
-		"folder": "folderTwo",
+		"folder": "folder-two",
 		"latencyMinutes": 10,
 		"orderedColumns": [
 			{
@@ -84,7 +84,7 @@
 	},
 
 	{
-		"name": "vmShutdown",
+		"name": "vm-shutdown",
 		"documentation": "virtual machine shutdown event",
 		"folder": "administration",
 		"latencyMinutes": 10,
@@ -107,7 +107,7 @@
 	}, 
 
 	{
-		"name": "vmStart",
+		"name": "vm-start",
 		"documentation": "virtual machine start event",
 		"folder": "administration",
 		"latencyMinutes": 10,
@@ -124,7 +124,7 @@
 	}, 
 
 	{
-		"name": "vmReboot",
+		"name": "vm-reboot",
 		"documentation": "virtual machine reboot event",
 		"folder": "administration",
 		"latencyMinutes": 10,

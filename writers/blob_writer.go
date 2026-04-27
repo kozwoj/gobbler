@@ -129,17 +129,8 @@ func (w *BlobWriter) Stats() WriterStats {
 func (w *BlobWriter) Rotate() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if len(w.buffer) > 0 && w.blobClient != nil {
-		payload := strings.Join(w.buffer, "\n") + "\n"
-		if _, err := w.blobClient.AppendBlock(context.Background(), readSeekCloser{strings.NewReader(payload)}, nil); err != nil {
-			fmt.Println("writers: BlobWriter: Rotate: append:", err)
-			return
-		}
-		w.itemsWritten += int64(len(w.buffer))
-		w.lastFlush = time.Now()
-		w.buffer = nil
-	}
-	// Nil the client so flush creates a new blob on the next write.
+	w.flush() // flush whatever is buffered, creating the blob if needed
+	// Nil the client so the next write opens a fresh blob.
 	w.blobClient = nil
 	w.blobStart = time.Time{}
 	w.currentBlob = ""

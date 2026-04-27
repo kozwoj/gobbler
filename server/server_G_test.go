@@ -90,7 +90,7 @@ func TestG6_StopReconfigureRestart(t *testing.T) {
 	s := New()
 	router := newTestRouter(s)
 
-	// First full cycle in dir1 — no ingest, so dir1/alphaFolder stays empty.
+	// First full cycle in dir1 — no ingest, so dir1/alpha-folder stays empty.
 	configureFileMode(t, router, dir1)
 	if w := do(t, router, http.MethodPost, "/gobbler/definition/add", alphaDef); w.Code != http.StatusOK {
 		t.Fatalf("add alpha (cycle 1): %d %s", w.Code, w.Body.String())
@@ -127,15 +127,15 @@ func TestG6_StopReconfigureRestart(t *testing.T) {
 
 	do(t, router, http.MethodPost, "/gobbler/pipeline/stop", "")
 
-	// Files must exist in dir2/alphaFolder.
-	entries2, err := os.ReadDir(filepath.Join(dir2, "alphaFolder"))
+	// Files must exist in dir2/alpha-folder.
+	entries2, err := os.ReadDir(filepath.Join(dir2, "alpha-folder"))
 	if err != nil || len(entries2) == 0 {
-		t.Errorf("expected CSV files in dir2/alphaFolder, got err=%v count=%d", err, len(entries2))
+		t.Errorf("expected CSV files in dir2/alpha-folder, got err=%v count=%d", err, len(entries2))
 	}
-	// dir1/alphaFolder must be empty (no ingest happened in cycle 1).
-	entries1, _ := os.ReadDir(filepath.Join(dir1, "alphaFolder"))
-	if len(entries1) != 0 {
-		t.Errorf("expected no CSV files in dir1/alphaFolder after reconfigure, got %d", len(entries1))
+	// dir1/alpha-folder must be empty (no ingest happened in cycle 1).
+	entries1, _ := os.ReadDir(filepath.Join(dir1, "alpha-folder"))
+	if len(entries1) > 0 {
+		t.Errorf("expected no CSV files in dir1/alpha-folder after reconfigure, got %d", len(entries1))
 	}
 }
 

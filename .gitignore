@@ -26,3 +26,6 @@ vendor/
 # OS
 Thumbs.db
 .DS_Store
+
+# Secrets
+tester/secrets.json

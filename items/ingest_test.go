@@ -11,7 +11,7 @@ import (
 const alphaJSON = `{
 	"name": "alpha",
 	"documentation": "test definition alpha with string, int and datetime types",
-	"folder": "alphaFolder",
+	"folder": "alpha-folder",
 	"latencyMinutes": 1,
 	"orderedColumns": [
 		{"name": "alphaStr",  "type": "string"},
@@ -23,7 +23,7 @@ const alphaJSON = `{
 const betaJSON = `{
 	"name": "beta",
 	"documentation": "test definition beta with string, bool and real types",
-	"folder": "bettaFolder",
+	"folder": "beta-folder",
 	"latencyMinutes": 2,
 	"orderedColumns": [
 		{"name": "betaStr",  "type": "string"},
@@ -35,7 +35,7 @@ const betaJSON = `{
 const gammaJSON = `{
 	"name": "gamma",
 	"documentation": "test definition gamma with int, string, and dynamic types",
-	"folder": "gammaFolder",
+	"folder": "gamma-folder",
 	"latencyMinutes": 3,
 	"orderedColumns": [
 		{"name": "gammaInt",     "type": "int"},
@@ -72,8 +72,8 @@ func TestDefinitionList_AddAndGet(t *testing.T) {
 	if def.TypeName != "alpha" {
 		t.Errorf("TypeName: got %q, want %q", def.TypeName, "alpha")
 	}
-	if def.Folder != "alphaFolder" {
-		t.Errorf("Folder: got %q, want %q", def.Folder, "alphaFolder")
+	if def.Folder != "alpha-folder" {
+		t.Errorf("Folder: got %q, want %q", def.Folder, "alpha-folder")
 	}
 	if def.Latency != 1 {
 		t.Errorf("Latency: got %d, want 1", def.Latency)

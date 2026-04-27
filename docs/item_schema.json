@@ -3,7 +3,7 @@
   "description": "item (log entry) type description",
   "type": "object",
   "properties": {
-    "name": {"type": "string"},
+    "name": {"type": "string", "minLength": 3, "optional": false},
     "documentation": {"type": "string", "optional": true},
     "folder": {"type": "string", "minLength": 3, "optional": true},
     "latencyMinutes": {"type": "integer", "optional": true},
