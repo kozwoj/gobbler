@@ -151,25 +151,49 @@ func TestD4_MixedBatch(t *testing.T) {
 	}
 }
 
-// D5: Malformed JSON body results in a parse error entry in rejected.
-func TestD5_MalformedJSON(t *testing.T) {
+// D5: Body that is not a JSON array at all returns 400.
+func TestD5_NotJSONArray(t *testing.T) {
 	router := startWithAlpha(t)
 	defer do(t, router, http.MethodPost, "/gobbler/pipeline/stop", "")
 
 	w := do(t, router, http.MethodPost, "/gobbler/ingest", `this is not json`)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 	body := decodeJSON(t, w)
-	if body["ingested"] != float64(0) {
-		t.Errorf("expected ingested=0, got %v", body["ingested"])
+	if _, hasError := body["error"]; !hasError {
+		t.Errorf("expected error key in response, got %v", body)
 	}
-	rejected, _ := body["rejected"].([]interface{})
-	if len(rejected) == 0 {
-		t.Fatalf("expected at least one rejected entry for malformed JSON, got none")
+}
+
+// D6: Empty JSON array returns 400.
+func TestD6_EmptyArray(t *testing.T) {
+	router := startWithAlpha(t)
+	defer do(t, router, http.MethodPost, "/gobbler/pipeline/stop", "")
+
+	w := do(t, router, http.MethodPost, "/gobbler/ingest", `[]`)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
-	entry, _ := rejected[0].(map[string]interface{})
-	if _, hasError := entry["error"]; !hasError {
-		t.Errorf("expected error key in parse-error rejected entry, got %v", entry)
+	body := decodeJSON(t, w)
+	if _, hasError := body["error"]; !hasError {
+		t.Errorf("expected error key in response, got %v", body)
+	}
+}
+
+// D7: Array where every item fails inner unmarshal (not a JSON object) returns 400.
+func TestD7_AllItemsUnmarshalFail(t *testing.T) {
+	router := startWithAlpha(t)
+	defer do(t, router, http.MethodPost, "/gobbler/pipeline/stop", "")
+
+	// Each item's value is a string, not a JSON object — all fail inner unmarshal.
+	w := do(t, router, http.MethodPost, "/gobbler/ingest",
+		`[{"alpha": "not-an-object"}, {"alpha": "also-not-an-object"}]`)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	body := decodeJSON(t, w)
+	if _, hasError := body["error"]; !hasError {
+		t.Errorf("expected error key in response, got %v", body)
 	}
 }

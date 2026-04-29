@@ -126,7 +126,8 @@ This is the end of the ingestion pipeline.
 Gobbler exposes REST endpoints under the `/gobbler` prefix (default port 8080):
 
 **Definition management**
-- `GET  /gobbler/definition/list` — list all registered item type definitions
+- `GET  /gobbler/definition/list` — list all registered item type definitions (full definition objects)
+- `GET  /gobbler/definition/names` — list registered item type names only (lightweight `["name1", "name2", ...]`)
 - `POST /gobbler/definition/add` — register a new item type (body: item definition JSON object)
 - `POST /gobbler/definition/remove` — remove a registered item type (body: `{"typeName": "..."}`)
 
@@ -138,7 +139,7 @@ Gobbler exposes REST endpoints under the `/gobbler` prefix (default port 8080):
 - `GET  /gobbler/pipeline/status` — return pipeline configuration and running state
 
 **Ingestion**
-- `POST /gobbler/ingest` — ingest an array of typed JSON items (body: `[{"typeName": {...fields}}, ...]`)
+- `POST /gobbler/ingest` — ingest an array of typed JSON items (body: `[{"typeName": {...fields}}, ...]`); returns 400 if the body is not a valid JSON array or contains no parseable items, 200 with `{"ingested": N, "rejected": [...]}` otherwise
 
 More detailed description of the architecture is in the `docs/` folder. 
 

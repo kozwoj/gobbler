@@ -161,3 +161,65 @@ func TestA5_IngestWhenNotRunning(t *testing.T) {
 		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// A6: Definition names returns an empty array when no definitions are registered.
+func TestA6_DefinitionNamesEmpty(t *testing.T) {
+	s := New()
+	router := newTestRouter(s)
+
+	w := do(t, router, http.MethodGet, "/gobbler/definition/names", "")
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var names []string
+	if err := json.NewDecoder(w.Body).Decode(&names); err != nil {
+		t.Fatalf("could not decode response as []string: %v", err)
+	}
+	if len(names) != 0 {
+		t.Errorf("expected empty array, got %v", names)
+	}
+}
+
+// A7: Definition names returns the registered type names.
+func TestA7_DefinitionNamesAfterAdd(t *testing.T) {
+	alphaDef := `{
+		"name": "alpha",
+		"documentation": "test definition",
+		"folder": "alpha-folder",
+		"latencyMinutes": 1,
+		"orderedColumns": [{"name": "alphaStr", "type": "string"}]
+	}`
+	betaDef := `{
+		"name": "beta",
+		"documentation": "test definition",
+		"folder": "beta-folder",
+		"latencyMinutes": 1,
+		"orderedColumns": [{"name": "betaStr", "type": "string"}]
+	}`
+
+	s := New()
+	router := newTestRouter(s)
+	do(t, router, http.MethodPost, "/gobbler/definition/add", alphaDef)
+	do(t, router, http.MethodPost, "/gobbler/definition/add", betaDef)
+
+	w := do(t, router, http.MethodGet, "/gobbler/definition/names", "")
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var names []string
+	if err := json.NewDecoder(w.Body).Decode(&names); err != nil {
+		t.Fatalf("could not decode response as []string: %v", err)
+	}
+	if len(names) != 2 {
+		t.Fatalf("expected 2 names, got %d: %v", len(names), names)
+	}
+	nameSet := make(map[string]bool, len(names))
+	for _, n := range names {
+		nameSet[n] = true
+	}
+	if !nameSet["alpha"] || !nameSet["beta"] {
+		t.Errorf("expected alpha and beta in names, got %v", names)
+	}
+}

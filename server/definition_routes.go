@@ -19,6 +19,9 @@ func (s *Server) definitionRoutes(r chi.Router) {
 	r.Get("/list", s.handleDefinitionList)
 	r.Get("/list/", s.handleDefinitionListHelp)
 
+	r.Get("/names", s.handleDefinitionNames)
+	r.Get("/names/", s.handleDefinitionNamesHelp)
+
 	r.Post("/remove", s.handleDefinitionRemove)
 	r.Get("/remove/", s.handleDefinitionRemoveHelp)
 }
@@ -29,6 +32,7 @@ func (s *Server) handleDefinitionDiscovery(w http.ResponseWriter, r *http.Reques
 		"available_routes": []string{
 			"/gobbler/definition/add",
 			"/gobbler/definition/list",
+			"/gobbler/definition/names",
 			"/gobbler/definition/remove",
 		},
 		"help": "Add trailing slash to a command path for details",
@@ -77,6 +81,20 @@ func (s *Server) handleDefinitionList(w http.ResponseWriter, r *http.Request) {
 		list = append(list, def)
 	}
 	sendJSON(w, list)
+}
+
+// handleDefinitionNames returns a lightweight JSON array of registered type
+// name strings. Intended for clients that only need to verify which types are
+// known without parsing full definitions.
+func (s *Server) handleDefinitionNames(w http.ResponseWriter, r *http.Request) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	names := make([]string, 0, len(s.definitions))
+	for name := range s.definitions {
+		names = append(names, name)
+	}
+	sendJSON(w, names)
 }
 
 func (s *Server) handleDefinitionRemove(w http.ResponseWriter, r *http.Request) {
@@ -138,6 +156,17 @@ func (s *Server) handleDefinitionListHelp(w http.ResponseWriter, r *http.Request
 		"endpoint":    "/gobbler/definition/list",
 		"input":       "none",
 		"returns":     "array of item definition objects",
+	})
+}
+
+func (s *Server) handleDefinitionNamesHelp(w http.ResponseWriter, r *http.Request) {
+	sendJSON(w, map[string]interface{}{
+		"command":     "definition/names",
+		"description": "Returns a lightweight array of registered item type name strings without full definition details.",
+		"method":      "GET",
+		"endpoint":    "/gobbler/definition/names",
+		"input":       "none",
+		"returns":     `["name1", "name2", ...]`,
 	})
 }
 

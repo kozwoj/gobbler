@@ -1,8 +1,10 @@
 package server
 
 import (
+	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -51,6 +53,27 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	inputItems, parseErrors := items.SplitInput(body)
+
+	// 400: body is not a JSON array at all.
+	if len(parseErrors) > 0 && errors.Is(parseErrors[0], items.ErrInvalidJSONArray) {
+		sendError(w, http.StatusBadRequest, parseErrors[0].Error())
+		return
+	}
+	// 400: array was valid JSON but contained nothing parseable (empty array,
+	// or every item failed inner unmarshal).
+	if len(inputItems) == 0 {
+		if len(parseErrors) == 0 {
+			sendError(w, http.StatusBadRequest, "empty input array")
+			return
+		}
+		msgs := make([]string, len(parseErrors))
+		for i, pe := range parseErrors {
+			msgs[i] = pe.Error()
+		}
+		sendError(w, http.StatusBadRequest, "no valid items in input: "+strings.Join(msgs, "; "))
+		return
+	}
+
 	timestamp := time.Now().UTC().Format("2006-01-02 15:04:05.000")
 
 	var rejected []map[string]interface{}
