@@ -26,25 +26,25 @@ func (r readSeekCloser) Close() error { return nil }
 // in an Azure Blob Storage container. The container name equals def.Folder.
 // Blobs rotate when their age exceeds the item's Latency.
 type BlobWriter struct {
-	buffer       []string
-	container    string
-	accountName  string
-	cred         *azblob.SharedKeyCredential
-	blobClient   *appendblob.Client
-	blobStart    time.Time
-	batchSize    int
-	maxAge       time.Duration
-	typeName     string
-	itemsWritten int64
-	lastFlush    time.Time
-	currentBlob  string
-	mu           sync.Mutex
+	buffer          []string
+	container       string
+	accountName     string
+	cred            *azblob.SharedKeyCredential
+	blobClient      *appendblob.Client
+	blobStart       time.Time
+	writerBatchSize int
+	maxAge          time.Duration
+	typeName        string
+	itemsWritten    int64
+	lastFlush       time.Time
+	currentBlob     string
+	mu              sync.Mutex
 }
 
 // NewBlobWriter creates a BlobWriter for the given definition and blob credentials.
 // It creates the Azure container if it does not already exist.
-// batchSize controls how many CSV lines trigger an immediate flush.
-func NewBlobWriter(cfg pipeline.BlobConfig, def items.ItemDefinition, batchSize int) (*BlobWriter, error) {
+// writerBatchSize controls how many CSV lines trigger an immediate flush.
+func NewBlobWriter(cfg pipeline.BlobConfig, def items.ItemDefinition, writerBatchSize int) (*BlobWriter, error) {
 	cred, err := azblob.NewSharedKeyCredential(cfg.AccountName, cfg.AccountKey)
 	if err != nil {
 		return nil, fmt.Errorf("writers: invalid blob credentials: %w", err)
@@ -68,12 +68,12 @@ func NewBlobWriter(cfg pipeline.BlobConfig, def items.ItemDefinition, batchSize 
 	}
 
 	return &BlobWriter{
-		container:   def.Folder,
-		accountName: cfg.AccountName,
-		cred:        cred,
-		batchSize:   batchSize,
-		maxAge:      maxAge,
-		typeName:    def.TypeName,
+		container:       def.Folder,
+		accountName:     cfg.AccountName,
+		cred:            cred,
+		writerBatchSize: writerBatchSize,
+		maxAge:          maxAge,
+		typeName:        def.TypeName,
 	}, nil
 }
 
@@ -107,7 +107,7 @@ func (w *BlobWriter) Add(item pipeline.CSVitem) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.buffer = append(w.buffer, item.CSV)
-	if len(w.buffer) >= w.batchSize {
+	if len(w.buffer) >= w.writerBatchSize {
 		w.flush()
 	}
 }

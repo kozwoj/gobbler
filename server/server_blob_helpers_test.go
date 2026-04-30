@@ -75,14 +75,14 @@ func configureBlobMode(t *testing.T, router http.Handler, sec blobSecrets) {
 }
 
 // configureBlobModeWithBatch is like configureBlobMode but with an explicit batchSize.
-func configureBlobModeWithBatch(t *testing.T, router http.Handler, sec blobSecrets, batchSize int) {
+func configureBlobModeWithBatch(t *testing.T, router http.Handler, sec blobSecrets, writerBatchSize int) {
 	t.Helper()
 	body, _ := json.Marshal(map[string]interface{}{
 		"mode":            "blob",
 		"accountName":     sec.AccountName,
 		"accountKey":      sec.AccountKey,
-		"workerQueueSize": 200,
-		"batchSize":       batchSize,
+		"writerQueueSize": 200,
+		"writerBatchSize": writerBatchSize,
 	})
 	w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure", string(body))
 	if w.Code != http.StatusOK {

@@ -19,22 +19,22 @@ const defaultMaxAge = 60 * time.Minute
 // FileWriter accumulates CSVitems in a buffer and flushes them to timestamped CSV
 // files under a local directory. Files rotate when their age exceeds the item's Latency.
 type FileWriter struct {
-	buffer       []string
-	file         *os.File
-	outputDir    string
-	fileStart    time.Time
-	batchSize    int
-	maxAge       time.Duration
-	typeName     string
-	itemsWritten int64
-	lastFlush    time.Time
-	mu           sync.Mutex
+	buffer          []string
+	file            *os.File
+	outputDir       string
+	fileStart       time.Time
+	writerBatchSize int
+	maxAge          time.Duration
+	typeName        string
+	itemsWritten    int64
+	lastFlush       time.Time
+	mu              sync.Mutex
 }
 
 // NewFileWriter creates a FileWriter for the given definition rooted at rootDir.
-// batchSize controls how many CSV lines trigger an immediate flush.
+// writerBatchSize controls how many CSV lines trigger an immediate flush.
 // The subdirectory rootDir/def.Folder is created if it does not exist.
-func NewFileWriter(rootDir string, def items.ItemDefinition, batchSize int) (*FileWriter, error) {
+func NewFileWriter(rootDir string, def items.ItemDefinition, writerBatchSize int) (*FileWriter, error) {
 	outputDir := filepath.Join(rootDir, def.Folder)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return nil, fmt.Errorf("writers: create directory %s: %w", outputDir, err)
@@ -44,10 +44,10 @@ func NewFileWriter(rootDir string, def items.ItemDefinition, batchSize int) (*Fi
 		maxAge = defaultMaxAge
 	}
 	return &FileWriter{
-		outputDir: outputDir,
-		batchSize: batchSize,
-		maxAge:    maxAge,
-		typeName:  def.TypeName,
+		outputDir:       outputDir,
+		writerBatchSize: writerBatchSize,
+		maxAge:          maxAge,
+		typeName:        def.TypeName,
 	}, nil
 }
 
@@ -85,9 +85,9 @@ func (w *FileWriter) Add(item pipeline.CSVitem) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.buffer = append(w.buffer, item.CSV)
-	if len(w.buffer) >= w.batchSize {
-		w.flush()
-	}
+	   if len(w.buffer) >= w.writerBatchSize {
+		   w.flush()
+	   }
 }
 
 // Stats returns a point-in-time snapshot of the writer's operational state.

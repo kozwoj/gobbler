@@ -99,21 +99,21 @@ func TestH_StatsAccuracy(t *testing.T) {
 	})
 }
 
-// TestH4_BatchSizeImmediate verifies that when exactly batchSize items are ingested
+// TestH4_BatchSizeImmediate verifies that when exactly writerBatchSize items are ingested
 // the flush is triggered immediately (no tick needed): itemsInBuffer == 0 and
-// itemsWritten == batchSize are visible in the very next status call.
+// itemsWritten == writerBatchSize are visible in the very next status call.
 func TestH4_BatchSizeImmediate(t *testing.T) {
 	t.Cleanup(pipeline.Reset)
 
-	// Read the batchSize we configure so the assertion stays in sync.
-	const batchSize = 50
+	// Read the writerBatchSize we configure so the assertion stays in sync.
+	const writerBatchSize = 50
 
 	outputDir := t.TempDir()
 	cfgBytes, _ := json.Marshal(map[string]interface{}{
 		"mode":            "file",
 		"outputDir":       outputDir,
-		"workerQueueSize": 100,
-		"batchSize":       batchSize,
+		"writerQueueSize": 100,
+		"writerBatchSize": writerBatchSize,
 	})
 	s := New()
 	router := newTestRouter(s)
@@ -129,16 +129,16 @@ func TestH4_BatchSizeImmediate(t *testing.T) {
 	}
 	defer do(t, router, http.MethodPost, "/gobbler/pipeline/stop", "")
 
-	if w := do(t, router, http.MethodPost, "/gobbler/ingest", alphaJSON(t, batchSize)); w.Code != http.StatusOK {
+	if w := do(t, router, http.MethodPost, "/gobbler/ingest", alphaJSON(t, writerBatchSize)); w.Code != http.StatusOK {
 		t.Fatalf("ingest: %d %s", w.Code, w.Body.String())
 	}
 
-	// The batch-size flush is synchronous inside Add(), so by the time the
+	// The writerBatchSize flush is synchronous inside Add(), so by the time the
 	// ingest response is returned the items are already written. A single
 	// status poll (with a brief yield for goroutine scheduling) is sufficient.
-	written := waitForWritten(t, router, "alpha", batchSize)
-	if written != float64(batchSize) {
-		t.Errorf("expected itemsWritten=%d after batch-size flush, got %.0f", batchSize, written)
+	written := waitForWritten(t, router, "alpha", writerBatchSize)
+	if written != float64(writerBatchSize) {
+		t.Errorf("expected itemsWritten=%d after batch-size flush, got %.0f", writerBatchSize, written)
 	}
 
 	// itemsInBuffer must also be zero.

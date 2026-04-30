@@ -22,7 +22,7 @@ func TestBlobH1_StatsAccuracy(t *testing.T) {
 
 	var cumulative float64
 
-	// H1 — ingest 10 items (below batchSize=50); wait for flush; itemsWritten == 10.
+	// H1 — ingest 10 items (below writerBatchSize=50); wait for flush; itemsWritten == 10.
 	t.Run("H1_TenItems", func(t *testing.T) {
 		const n = 10
 		w := do(t, router, http.MethodPost, "/gobbler/ingest", alphaJSON(t, n))
@@ -69,14 +69,14 @@ func TestBlobH1_StatsAccuracy(t *testing.T) {
 	})
 }
 
-// TestBlobH4_BatchSizeImmediate verifies that when exactly batchSize items are
+// TestBlobH4_BatchSizeImmediate verifies that when exactly writerBatchSize items are
 // ingested the BlobWriter flushes synchronously: itemsInBuffer == 0 and
-// itemsWritten == batchSize are visible in the very next status call.
+// itemsWritten == writerBatchSize are visible in the very next status call.
 // Skipped if ../tester/secrets.json is absent.
 func TestBlobH4_BatchSizeImmediate(t *testing.T) {
 	sec := loadBlobSecrets(t)
 
-	const batchSize = 10 // small enough for a quick test, large enough to confirm threshold logic
+	const writerBatchSize = 10 // small enough for a quick test, large enough to confirm threshold logic
 
 	alphaContainer := newBlobContainer("alpha")
 	t.Cleanup(func() { deleteContainer(sec, alphaContainer) })
@@ -84,7 +84,7 @@ func TestBlobH4_BatchSizeImmediate(t *testing.T) {
 	s := New()
 	router := newTestRouter(s)
 
-	configureBlobModeWithBatch(t, router, sec, batchSize)
+	configureBlobModeWithBatch(t, router, sec, writerBatchSize)
 	if w := do(t, router, http.MethodPost, "/gobbler/definition/add", blobAlphaDef(alphaContainer)); w.Code != http.StatusOK {
 		t.Fatalf("add alpha: %d %s", w.Code, w.Body.String())
 	}
@@ -93,7 +93,7 @@ func TestBlobH4_BatchSizeImmediate(t *testing.T) {
 	}
 	defer do(t, router, http.MethodPost, "/gobbler/pipeline/stop", "")
 
-	batch, err := tester.NewAlphaGenerator().GenerateJSONArray(batchSize)
+	batch, err := tester.NewAlphaGenerator().GenerateJSONArray(writerBatchSize)
 	if err != nil {
 		t.Fatalf("generate alpha: %v", err)
 	}
@@ -103,9 +103,9 @@ func TestBlobH4_BatchSizeImmediate(t *testing.T) {
 
 	// The batch-size flush is triggered synchronously inside BlobWriter.Add,
 	// so itemsWritten should reach batchSize quickly.
-	written := waitForWritten(t, router, "alpha", batchSize)
-	if written != float64(batchSize) {
-		t.Errorf("expected itemsWritten=%d after batch-size flush, got %.0f", batchSize, written)
+	written := waitForWritten(t, router, "alpha", writerBatchSize)
+	if written != float64(writerBatchSize) {
+		t.Errorf("expected itemsWritten=%d after batch-size flush, got %.0f", writerBatchSize, written)
 	}
 
 	w := do(t, router, http.MethodGet, "/gobbler/pipeline/status", "")

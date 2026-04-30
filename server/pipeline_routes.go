@@ -48,8 +48,8 @@ func (s *Server) handlePipelineConfigure(w http.ResponseWriter, r *http.Request)
 		OutputDir       string `json:"outputDir"`
 		AccountName     string `json:"accountName"`
 		AccountKey      string `json:"accountKey"`
-		WorkerQueueSize int    `json:"workerQueueSize"`
-		BatchSize       int    `json:"batchSize"`
+		WriterQueueSize int    `json:"writerQueueSize"`
+		WriterBatchSize int    `json:"writerBatchSize"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sendError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
@@ -77,8 +77,8 @@ func (s *Server) handlePipelineConfigure(w http.ResponseWriter, r *http.Request)
 		OutputDir:       req.OutputDir,
 		AccountName:     req.AccountName,
 		AccountKey:      req.AccountKey,
-		WorkerQueueSize: req.WorkerQueueSize,
-		BatchSize:       req.BatchSize,
+		WriterQueueSize: req.WriterQueueSize,
+		WriterBatchSize: req.WriterBatchSize,
 	}
 
 	s.mu.Lock()
@@ -203,8 +203,8 @@ func (s *Server) handlePipelineStatus(w http.ResponseWriter, r *http.Request) {
 
 	if s.config != nil {
 		status["mode"] = string(s.config.Mode)
-		status["workerQueueSize"] = s.config.WorkerQueueSize
-		status["batchSize"] = s.config.BatchSize
+		status["writerQueueSize"] = s.config.WriterQueueSize
+		status["writerBatchSize"] = s.config.WriterBatchSize
 	}
 
 	if s.running {

@@ -92,7 +92,7 @@ func (s *Server) startType(def items.ItemDefinition) error {
 	var w Writer
 	switch s.config.Mode {
 	case pipeline.StorageModeFile:
-		fw, err := writers.NewFileWriter(s.config.OutputDir, def, s.config.BatchSize)
+		fw, err := writers.NewFileWriter(s.config.OutputDir, def, s.config.WriterBatchSize)
 		if err != nil {
 			cancel()
 			return fmt.Errorf("start type %s: %w", def.TypeName, err)
@@ -102,7 +102,7 @@ func (s *Server) startType(def items.ItemDefinition) error {
 		bw, err := writers.NewBlobWriter(pipeline.BlobConfig{
 			AccountName: s.config.AccountName,
 			AccountKey:  s.config.AccountKey,
-		}, def, s.config.BatchSize)
+		}, def, s.config.WriterBatchSize)
 		if err != nil {
 			cancel()
 			return fmt.Errorf("start type %s: %w", def.TypeName, err)
@@ -115,7 +115,7 @@ func (s *Server) startType(def items.ItemDefinition) error {
 	entry.writer = w
 
 	w.Start(ctx, &entry.wg)
-	worker := pipeline.NewWorker(ctx, &entry.wg, s.config.WorkerQueueSize, w.Add)
+	worker := pipeline.NewWorker(ctx, &entry.wg, s.config.WriterQueueSize, w.Add)
 
 	s.types[pipeline.ItemType(def.TypeName)] = entry
 	pipeline.AddItemType(pipeline.ItemType(def.TypeName), &pipeline.TypeDescriptor{

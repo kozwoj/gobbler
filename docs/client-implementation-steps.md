@@ -1,0 +1,101 @@
+Read [](file:///c%3A/Users/kozac/Source/go/gobbler/docs/gobbler-logging-client.md#1-1), lines 1 to 180
+
+Here is a proposed step-by-step implementation plan, ordered so each step is independently testable before moving to the next:
+
+---
+
+## Gobbler Client SDK — Implementation Steps
+
+### Step 1 — Module scaffold
+- Create `client/go.mod` (`module github.com/kozwoj/gobbler-client`, `go 1.24.1`)
+- Create `client/client.go` with the `Client` interface and stub implementations
+- Create `client/options.go` with option types (no logic yet)
+- Add `replace` directive to `gobbler/go.mod` pointing at `./client`
+
+**Test**: `go build ./client/` passes; nothing else yet.
+
+---
+
+### Step 2 — `nopClient` and `Nop()`
+- Implement `nopClient` struct satisfying `Client` — all methods return nil
+- Implement `Nop() Client`
+- Write unit tests: `Log`, `Flush`, `Close`, `SwapServer` on a nop client all return nil, no panic
+
+**Test**: pure unit tests, no network.
+
+---
+
+### Step 3 — Options and defaults
+- Implement `WithTypes(names ...string)`, `WithBatchSize(n int)`, `WithFlushInterval(d time.Duration)`
+- Implement an internal `config` struct populated by options, with defaults (e.g. batchSize=100, flushInterval=10s)
+- Write unit tests: verify config is applied and defaults kick in when options are omitted
+
+**Test**: pure unit tests, no network.
+
+---
+
+### Step 4 — Buffer and `Log`
+- Implement `realClient` with a `[]bufItem` buffer protected by a mutex
+- Implement `Log(typeName string, fields map[string]any) error`
+  - Unknown type name → immediate error
+  - Append to buffer
+  - If `len(buffer) >= batchSize` → call internal `flush()` (implemented as no-op stub for now)
+- Write unit tests: unknown type, buffer growth, threshold detection
+
+**Test**: pure unit tests, no network.
+
+---
+
+### Step 5 — Serialisation and HTTP flush
+- Implement internal `flush()`: serialise buffer as `[{"typeName":{fields}}, ...]` JSON, POST to `/gobbler/ingest`
+- Implement response parsing: 400 → error (no retry), 200+rejected → error listing rejections, 5xx → hold buffer (return error but do not drain)
+- Implement `Flush() error` (public: acquires lock, calls flush, returns error)
+- Write unit tests using `httptest.NewServer` to simulate 200, 200+rejected, 400, 500 responses
+
+**Test**: unit tests with a fake HTTP server — no real Gobbler needed.
+
+---
+
+### Step 6 — Background flush goroutine and `Close`
+- Start a ticker goroutine inside `New()` (or a separate `start()` method) that calls flush every `flushInterval`
+- Implement `Close() error`: signal goroutine to stop, flush remaining buffer, return any error
+- Write unit tests: verify items are flushed after interval elapses; verify buffer is drained on Close; verify Close is idempotent
+
+**Test**: unit tests with `httptest.NewServer` and short flush intervals.
+
+---
+
+### Step 7 — Server validation in `New()`
+- Implement `validateServer(endpoint string, types []string) error`:
+  - GET `/gobbler/pipeline/status` → parse `running` bool
+  - GET `/gobbler/definition/names` → check all registered types are present
+- Call from `New()`: on failure return `Nop()` + error
+- Write unit tests using `httptest.NewServer` simulating: not running, missing types, all valid
+
+**Test**: unit tests with a fake HTTP server.
+
+---
+
+### Step 8 — `SwapServer`
+- Implement `SwapServer(newURL string) error`: validate new target, then atomically swap endpoint
+- In-progress flush completes against old endpoint; subsequent flushes use new one
+- Write unit tests: successful swap routes subsequent flushes to new server; failed validation keeps old server; concurrent flush + swap is race-free (`go test -race`)
+
+**Test**: unit tests with two `httptest.NewServer` instances.
+
+---
+
+### Step 9 — Integration test against a real Gobbler server
+- Add an integration test (build-tag `//go:build integration`) that:
+  - Starts a real `server.Server` in-process
+  - Registers a type definition and starts the pipeline
+  - Constructs a client with `New()`
+  - Logs items, calls `Flush()`, verifies the server received them via `pipeline/status` or stats
+  - Tests `SwapServer` between two in-process servers
+
+**Test**: `go test -tags integration ./client/`
+
+---
+
+### Resolved open questions before starting Step 6
+Before implementing `Close` you need a decision on: **does `Close` drain the buffer even if a mid-flush error occurs?** Recommend yes — drain and collect all errors, return the first non-nil. Otherwise items are silently lost on a transient 5xx.

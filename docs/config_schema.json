@@ -7,7 +7,11 @@
     "outputDir": {"type": "string", "optional": true},
     "accountName": {"type": "string", "optional": true},
     "accountKey": {"type": "string", "optional": true},
-    "workerQueueSize": {"type": "integer", "optional": false},
-    "batchSize": {"type": "integer", "optional": false}
+    "writerQueueSize": {"type": "integer", "optional": false},
+    "writerBatchSize": {"type": "integer", "optional": false},
+    "loggerEndpoint": {"type": "string", "optional": true},
+    "loggerTypes": {"type": "array", "items": {"type": "string"}, "optional": true},
+    "loggerBatchSize": {"type": "integer", "optional": true},
+    "loggerFlushInterval": {"type": "string", "optional": true}
   }
 }

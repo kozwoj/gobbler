@@ -43,8 +43,8 @@ func configureFileMode(t *testing.T, router http.Handler, outputDir string) {
 	cfgBytes, _ := json.Marshal(map[string]interface{}{
 		"mode":            "file",
 		"outputDir":       outputDir,
-		"workerQueueSize": 200,
-		"batchSize":       50,
+		"writerQueueSize": 200,
+		"writerBatchSize": 50,
 	})
 	w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure", string(cfgBytes))
 	if w.Code != http.StatusOK {
