@@ -19,7 +19,7 @@ The Gobbler processes incoming JSON items through a sequence of well‑defined s
   - The ingest handler looks up the type's `TypeDescriptor` via an atomic routing table (`pipeline.LookupType`) and does a non‑blocking send into the worker's queue.
   - If the queue is full the item is rejected immediately and reported back to the caller — no silent drops.
   - The worker goroutine calls the writer's `Add` method for each dequeued `CSVitem`.
-  - The writer accumulates CSV strings in a batch buffer; when the buffer reaches `batchSize` it is flushed to a file or blob.
+    - The writer accumulates CSV strings in a batch buffer; when the buffer reaches `writerBatchSize` it is flushed to a file or blob.
   - When a file/blob reaches its configured size the writer rotates it (closes the current file/blob and opens a new one).
   - This is the end of the ingestion pipeline.
 

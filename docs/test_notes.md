@@ -102,7 +102,7 @@ These tests verify that `status.types[T].itemsWritten` matches the count returne
 | H1 | Ingest exactly 10 `alpha` items (batch size > 10); wait for flush tick; check status | `alpha.itemsWritten == 10` |
 | H2 | Ingest another 15 `alpha` items; wait; check status | `alpha.itemsWritten == 25` (cumulative) |
 | H3 | Ingest a mixed batch of 5 valid `alpha` + 3 invalid items; check ingest response and then status | `ingested == 5`, `rejected` len == 3; `alpha.itemsWritten` increased by exactly 5 after flush |
-| H4 | Ingest exactly `batchSize` items in one call | Immediate flush triggered (no tick needed); `itemsInBuffer == 0` and `itemsWritten == batchSize` visible in next status call |
+| H4 | Ingest exactly `writerBatchSize` items in one call | Immediate flush triggered (no tick needed); `itemsInBuffer == 0` and `itemsWritten == writerBatchSize` visible in next status call |
 
 ---
 

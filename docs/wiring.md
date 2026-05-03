@@ -25,8 +25,8 @@ The REST definition endpoint performs these steps in order:
 
 2. items.DefinitionList.AddDefinition(def)   // store in the items registry
 
-3. writer := writers.NewFileWriter(rootDir, def, batchSize)   // file writer  ─┐ pick one
-        or writers.NewBlobWriter(blobCfg, def, batchSize)     // blob writer  ─┘
+3. writer := writers.NewFileWriter(rootDir, def, writerBatchSize)   // file writer  ─┐ pick one
+   or writers.NewBlobWriter(blobCfg, def, writerBatchSize)     // blob writer  ─┘
 
 4. writer.Start(ctx, wg)                     // start time-based flush goroutine
 
@@ -73,7 +73,7 @@ ingest endpoint
       │  desc := pipeline.LookupType(typeName)   // atomic routing table load
       │  non-blocking send to desc.Queue
       ▼
- per-type queue  (chan CSVitem, capacity = workerQueueSize)
+ per-type queue  (chan CSVitem, capacity = writerQueueSize)
    = desc.Queue = worker.Queue
       │
       │  Worker[CSVitem] goroutine (pipeline.NewWorker)
@@ -82,7 +82,7 @@ ingest endpoint
  writer buffer  ([]string in FileWriter / BlobWriter)
       │
       │  flush triggered by:
-      │    • buffer len ≥ batchSize  (threshold-based, inside Add)
+      │    • buffer len ≥ writerBatchSize  (threshold-based, inside Add)
       │    • ticker every 500 ms     (time-based, inside Start goroutine)
       │    • ctx.Done()              (shutdown flush, drains queue first)
       ▼

@@ -7,9 +7,11 @@ type Option func(*config)
 
 // config holds the resolved configuration for a realClient.
 type config struct {
-	types         map[string]struct{}
-	batchSize     int
-	flushInterval time.Duration
+	types           map[string]struct{}
+	batchSize       int
+	flushInterval   time.Duration
+	maxBufSize      int
+	maxFlushRetries int
 }
 
 // WithTypes registers the type names the client should log and are understood by the Gobbler server.
@@ -38,11 +40,49 @@ func WithFlushInterval(d time.Duration) Option {
 	}
 }
 
-// defaultConfig returns a config populated with default values.
+// WithMaxBufSize sets the maximum number of items the buffer may hold.
+// Once the cap is reached, Log() drops the incoming item and returns an error
+// (ErrBufferFull or ErrBufferFullServerDown) rather than appending.
+// Default: 10 × batchSize (applied after all options are resolved).
+func WithMaxBufSize(n int) Option {
+	return func(c *config) {
+		c.maxBufSize = n
+	}
+}
+
+// WithMaxFlushRetries sets how many consecutive 5xx (or network) flush failures
+// are tolerated before the buffer is forcibly drained to prevent unbounded growth.
+// After a drain the failure counter resets and the client resumes normal operation.
+// Default: 3.
+func WithMaxFlushRetries(n int) Option {
+	return func(c *config) {
+		c.maxFlushRetries = n
+	}
+}
+
+// defaultConfig returns a config with all defaults applied.
 func defaultConfig() config {
 	return config{
-		types:         make(map[string]struct{}),
-		batchSize:     100,
-		flushInterval: 10 * time.Second,
+		types:           make(map[string]struct{}),
+		batchSize:       100,
+		flushInterval:   10 * time.Second,
+		maxFlushRetries: 3,
+		// maxBufSize default (10 × batchSize) is applied in applyOptions after
+		// all options have been processed, so the caller's WithBatchSize is
+		// respected when computing the default cap.
+		maxBufSize: 0,
 	}
+}
+
+// applyOptions applies the given options to the default config and returns it.
+func applyOptions(opts []Option) config {
+	c := defaultConfig()
+	for _, o := range opts {
+		o(&c)
+	}
+	// Apply the maxBufSize default now that batchSize is finalised.
+	if c.maxBufSize == 0 {
+		c.maxBufSize = 10 * c.batchSize
+	}
+	return c
 }

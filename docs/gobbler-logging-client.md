@@ -49,7 +49,7 @@ initial design.
 // Construction
 client, err := gobblerclient.New("http://localhost:8080",
     gobblerclient.WithTypes("vm-shutdown", "vm-reboot", "allscalars"),
-    gobblerclient.WithBatchSize(50),
+    gobblerclient.WithWriterBatchSize(50),
     gobblerclient.WithFlushInterval(5 * time.Second),
 )
 
@@ -95,7 +95,7 @@ handles mixed-type batches in a single request.
 Items accumulate in a single shared in-memory buffer, each tagged with their
 type name. This matches the Gobbler ingest body format directly:
 `[{"typeName": {fields}}, ...]`. A flush is triggered by:
-- the buffer reaching `batchSize` items total (threshold flush)
+- the buffer reaching `writerBatchSize` items total (threshold flush)
 - the background goroutine's `flushInterval` ticker (time-based flush)
 - an explicit call to `Flush()` or `Close()`
 
@@ -109,11 +109,11 @@ The client distinguishes server responses by their HTTP status class:
 
 - **400 Bad Request** -- the request body was structurally invalid (not a JSON
   array, or malformed JSON). This is a client-side bug; retrying the same payload
-  will always get 400. No retry.
+  will always get 400. No retry. Buffer is drained.
 - **200 OK with rejected items** -- the server processed the batch but rejected
   individual items (unknown type name, invalid field values). The items were
   consumed; retrying them would produce the same rejection. No retry. The
-  rejected list is surfaced as an error to the caller.
+  rejected list is surfaced as an error to the caller. Buffer is drained.
 - **5xx Server Error** -- the server was unavailable or failed internally. The
   batch may not have been processed at all, so retry is appropriate. The buffer
   is held (not drained) until a successful 2xx response is received.
@@ -122,6 +122,33 @@ Log returns an error synchronously if the type name is not registered.
 Network errors and non-2xx responses are returned from Flush and Close. When
 a threshold flush occurs inside Log, any resulting error is also returned to
 the caller.
+
+### 5xx retry policy and buffer bounds
+
+The background flush ticker acts as the retry loop — no explicit in-flush
+retries are performed. Each tick is one retry attempt. On success the failure
+counter resets to zero. After `maxFlushRetries` consecutive 5xx responses the
+buffer is drained (items dropped) and the counter resets, preventing unbounded
+memory growth during a prolonged outage. New items accumulate normally after
+the wipe; the client never permanently gives up.
+
+A separate `maxBufSize` cap (default: 10× batchSize, configurable via
+`WithMaxBufSize`) bounds how many items can accumulate between ticks. Once the
+cap is reached, each new `Log()` call drops the incoming item and returns an
+error immediately, independent of the failure counter.
+
+Because a full buffer can have two distinct causes, `Log()` returns one of two
+sentinel errors so callers can distinguish them:
+
+```go
+var ErrBufferFull       = errors.New("gobblerclient: buffer full, item dropped")
+var ErrBufferFullServerDown = errors.New("gobblerclient: buffer full, server unreachable")
+```
+
+`ErrBufferFullServerDown` is returned when the failure counter is > 0 (at least
+one consecutive 5xx has occurred). `ErrBufferFull` is returned when the buffer
+hit the cap during normal operation (server healthy but log rate exceeds flush
+throughput). Callers use `errors.Is()` to tell them apart.
 
 ## Null-object / no-op behaviour
 
@@ -169,8 +196,6 @@ the load balancer handles failover transparently.
 
 - Should Close drain remaining items even if a mid-flush error occurs, or stop
   on first error?
-- Retry policy for 5xx: fixed delay, exponential backoff, max attempts -- not
-  decided for v1.
 
 ## Server contract (Gobbler server requirements)
 

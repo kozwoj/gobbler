@@ -1,6 +1,16 @@
 // Package gobblerclient provides a client for sending log items to a Gobbler server.
 package gobblerclient
 
+import "errors"
+
+// ErrBufferFull is returned by Log when the buffer has reached its cap during
+// normal operation (server healthy, log rate exceeds flush throughput).
+var ErrBufferFull = errors.New("gobblerclient: buffer full, item dropped")
+
+// ErrBufferFullServerDown is returned by Log when the buffer has reached its cap
+// and at least one consecutive flush failure has occurred (server unreachable or 5xx).
+var ErrBufferFullServerDown = errors.New("gobblerclient: buffer full, server unreachable")
+
 // Client is the interface for sending log items to a Gobbler server.
 // Both realClient and nopClient implement this interface.
 type Client interface {

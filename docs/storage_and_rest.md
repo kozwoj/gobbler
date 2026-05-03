@@ -27,14 +27,14 @@ To select the mode Gobbler provides REST endpoint `gobbler/pipeline/configure`. 
     "accountKey": {"type": "string", "optional": true},
     "centralQueueSize": {"type": "integer", "optional": false},
     "workerQueueSize": {"type": "integer", "optional": false},
-    "batchSize": {"type": "integer", "optional": false}
+    "writerBatchSize": {"type": "integer", "optional": false}
   }
 }
 ```
 
 The value of `mode` must be either "file" or "blob". If the mode is "file" the `outputDir` must be provided. If the mode is "blob", both `accountName` and `accountKey` must be provides. 
 
-The values of `outputDir` is passed to FileWrites. The values of `accountName` and `accountKey` are passed to BlobWriters. The value of `batchSize` defines the batchSize property of all writers. 
+The values of `outputDir` is passed to FileWrites. The values of `accountName` and `accountKey` are passed to BlobWriters. The value of `writerBatchSize` defines the writerBatchSize property of all writers. 
 
 The `gobbler/pipeline/configure` endpoint should be called before any other calls, as it defines global configuration constraints of the pipeline. 
 
@@ -78,8 +78,8 @@ type Config struct {
     OutputDir        string      // file mode only
     AccountName      string      // blob mode only
     AccountKey       string      // blob mode only
-    WorkerQueueSize  int
-    BatchSize        int
+    WriterQueueSize  int
+    WriterBatchSize  int
 }
 ```
 

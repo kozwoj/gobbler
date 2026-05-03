@@ -6,7 +6,7 @@ Here is a proposed step-by-step implementation plan, ordered so each step is ind
 
 ## Gobbler Client SDK — Implementation Steps
 
-### Step 1 — Module scaffold
+### ~~Step 1 — Module scaffold~~ ✓ DONE
 - Create `client/go.mod` (`module github.com/kozwoj/gobbler-client`, `go 1.24.1`)
 - Create `client/client.go` with the `Client` interface and stub implementations
 - Create `client/options.go` with option types (no logic yet)
@@ -16,7 +16,7 @@ Here is a proposed step-by-step implementation plan, ordered so each step is ind
 
 ---
 
-### Step 2 — `nopClient` and `Nop()`
+### ~~Step 2 — `nopClient` and `Nop()`~~ ✓ DONE
 - Implement `nopClient` struct satisfying `Client` — all methods return nil
 - Implement `Nop() Client`
 - Write unit tests: `Log`, `Flush`, `Close`, `SwapServer` on a nop client all return nil, no panic
@@ -25,28 +25,28 @@ Here is a proposed step-by-step implementation plan, ordered so each step is ind
 
 ---
 
-### Step 3 — Options and defaults
-- Implement `WithTypes(names ...string)`, `WithBatchSize(n int)`, `WithFlushInterval(d time.Duration)`
-- Implement an internal `config` struct populated by options, with defaults (e.g. batchSize=100, flushInterval=10s)
+### ~~Step 3 — Options and defaults~~ ✓ DONE
+ - Implement `WithTypes(names ...string)`, `WithWriterBatchSize(n int)`, `WithFlushInterval(d time.Duration)`
+ - Implement an internal `config` struct populated by options, with defaults (e.g. writerBatchSize=100, flushInterval=10s)
 - Write unit tests: verify config is applied and defaults kick in when options are omitted
 
 **Test**: pure unit tests, no network.
 
 ---
 
-### Step 4 — Buffer and `Log`
+### ~~Step 4 — Buffer and `Log`~~ ✓ DONE
 - Implement `realClient` with a `[]bufItem` buffer protected by a mutex
 - Implement `Log(typeName string, fields map[string]any) error`
   - Unknown type name → immediate error
   - Append to buffer
-  - If `len(buffer) >= batchSize` → call internal `flush()` (implemented as no-op stub for now)
+  - If `len(buffer) >= writerBatchSize` → call internal `flush()` (implemented as no-op stub for now)
 - Write unit tests: unknown type, buffer growth, threshold detection
 
 **Test**: pure unit tests, no network.
 
 ---
 
-### Step 5 — Serialisation and HTTP flush
+### ~~Step 5 — Serialisation and HTTP flush~~ ✓ DONE
 - Implement internal `flush()`: serialise buffer as `[{"typeName":{fields}}, ...]` JSON, POST to `/gobbler/ingest`
 - Implement response parsing: 400 → error (no retry), 200+rejected → error listing rejections, 5xx → hold buffer (return error but do not drain)
 - Implement `Flush() error` (public: acquires lock, calls flush, returns error)
@@ -56,7 +56,7 @@ Here is a proposed step-by-step implementation plan, ordered so each step is ind
 
 ---
 
-### Step 6 — Background flush goroutine and `Close`
+### ~~Step 6 — Background flush goroutine and `Close`~~ ✓ DONE
 - Start a ticker goroutine inside `New()` (or a separate `start()` method) that calls flush every `flushInterval`
 - Implement `Close() error`: signal goroutine to stop, flush remaining buffer, return any error
 - Write unit tests: verify items are flushed after interval elapses; verify buffer is drained on Close; verify Close is idempotent

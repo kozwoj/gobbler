@@ -37,7 +37,7 @@ per flush.
 
 | Field         | Type   | Description                                      |
 |---------------|--------|--------------------------------------------------|
-| `typeName`    | string | Item type being flushed                          |
+| `itemType`    | string | Item type being flushed                          |
 | `output`      | string | Active file path or blob name                    |
 | `itemsFlushed`| int    | Number of CSV lines written in this flush        |
 | `durationMs`  | int    | Flush wall time in milliseconds                  |
@@ -49,7 +49,7 @@ Emitted wherever a writer currently has a `fmt.Println` on an error path
 
 | Field       | Type   | Description                                       |
 |-------------|--------|---------------------------------------------------|
-| `typeName`  | string | Item type whose writer encountered the error      |
+| `itemType`  | string | Item type whose writer encountered the error      |
 | `operation` | string | `"flush"`, `"rotate"`, or `"open"`               |
 | `errorMsg`  | string | Error message string                              |
 
@@ -61,7 +61,7 @@ Low-volume lifecycle events useful for auditing restarts.
 | Field      | Type   | Description                                         |
 |------------|--------|-----------------------------------------------------|
 | `event`    | string | `"start"`, `"stop"`, or `"rotate"`                 |
-| `typeName` | string | Relevant type name for `"rotate"`; empty otherwise  |
+| `itemType` | string | Relevant type name for `"rotate"`; empty otherwise  |
 
 ---
 
@@ -99,7 +99,7 @@ rules and can be changed to match your storage layout.
   "folder": "gobbler-writer",
   "latencyMinutes": 5,
   "orderedColumns": [
-    { "name": "typeName",     "type": "string", "optional": false },
+    { "name": "itemType",     "type": "string", "optional": false },
     { "name": "output",       "type": "string", "optional": true  },
     { "name": "itemsFlushed", "type": "int",    "optional": false },
     { "name": "durationMs",   "type": "int",    "optional": false }
@@ -116,7 +116,7 @@ rules and can be changed to match your storage layout.
   "folder": "gobbler-writer",
   "latencyMinutes": 5,
   "orderedColumns": [
-    { "name": "typeName",  "type": "string", "optional": false },
+    { "name": "itemType",  "type": "string", "optional": false },
     { "name": "operation", "type": "string", "optional": false },
     { "name": "errorMsg",  "type": "string", "optional": false }
   ]
@@ -133,7 +133,7 @@ rules and can be changed to match your storage layout.
   "latencyMinutes": 5,
   "orderedColumns": [
     { "name": "event",    "type": "string", "optional": false },
-    { "name": "typeName", "type": "string", "optional": true  }
+    { "name": "itemType", "type": "string", "optional": true  }
   ]
 }
 ```
@@ -176,7 +176,7 @@ in the configure payload so it is unambiguous alongside `loggerBatchSize`.
   "mode": "blob",
   "accountName": "...",
   "accountKey": "...",
-  "workerQueueSize": 100,
+  "writerQueueSize": 100,
   "writerBatchSize": 50,
   "loggerEndpoint": "http://logger-gobbler:8080",
   "loggerTypes": [
