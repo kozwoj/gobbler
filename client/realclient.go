@@ -24,20 +24,26 @@ type realClient struct {
 	buf          []bufItem
 	server       string
 	httpClient   *http.Client
-	failureCount int       // consecutive flush failures (network error or 5xx)
+	failureCount int // consecutive flush failures (network error or 5xx)
 	done         chan struct{}
 	closeOnce    sync.Once
 }
 
 // New constructs a Client that buffers log items and flushes them to serverURL.
-// Server validation (running + registered types present) is added in Step 7.
+// It validates the target server before returning: the pipeline must be running
+// and all registered type names must be present. On failure it returns a Nop()
+// client plus the validation error.
 func New(serverURL string, opts ...Option) (Client, error) {
 	cfg := applyOptions(opts)
+	hc := http.DefaultClient
+	if err := validateServer(serverURL, cfg.types, hc); err != nil {
+		return Nop(), err
+	}
 	rc := &realClient{
 		cfg:        cfg,
 		buf:        make([]bufItem, 0, cfg.batchSize),
 		server:     serverURL,
-		httpClient: http.DefaultClient,
+		httpClient: hc,
 		done:       make(chan struct{}),
 	}
 	rc.start()
@@ -189,8 +195,18 @@ func (r *realClient) Close() error {
 	return err
 }
 
-// SwapServer validates newURL and atomically replaces the current endpoint.
-// Validation and atomic swap are implemented in Step 8.
+// SwapServer validates newURL against the same checks as New() (pipeline
+// running, all registered types present), then atomically replaces the
+// endpoint. Any flush already in flight completes against the old server;
+// subsequent flushes use newURL. If validation fails, the old server is kept
+// and the validation error is returned.
 func (r *realClient) SwapServer(newURL string) error {
+	// Validate outside the lock: network I/O must not block flush callers.
+	if err := validateServer(newURL, r.cfg.types, r.httpClient); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	r.server = newURL
+	r.mu.Unlock()
 	return nil
 }

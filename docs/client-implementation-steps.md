@@ -65,7 +65,7 @@ Here is a proposed step-by-step implementation plan, ordered so each step is ind
 
 ---
 
-### Step 7 — Server validation in `New()`
+### ~~Step 7 — Server validation in `New()`~~ ✓ DONE
 - Implement `validateServer(endpoint string, types []string) error`:
   - GET `/gobbler/pipeline/status` → parse `running` bool
   - GET `/gobbler/definition/names` → check all registered types are present
@@ -76,7 +76,7 @@ Here is a proposed step-by-step implementation plan, ordered so each step is ind
 
 ---
 
-### Step 8 — `SwapServer`
+### ~~Step 8 — `SwapServer`~~ ✓ DONE
 - Implement `SwapServer(newURL string) error`: validate new target, then atomically swap endpoint
 - In-progress flush completes against old endpoint; subsequent flushes use new one
 - Write unit tests: successful swap routes subsequent flushes to new server; failed validation keeps old server; concurrent flush + swap is race-free (`go test -race`)

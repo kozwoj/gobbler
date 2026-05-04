@@ -25,8 +25,7 @@ To select the mode Gobbler provides REST endpoint `gobbler/pipeline/configure`. 
     "outputDir": {"type": "string", "optional": true},
     "accountName": {"type": "string", "optional": true},
     "accountKey": {"type": "string", "optional": true},
-    "centralQueueSize": {"type": "integer", "optional": false},
-    "workerQueueSize": {"type": "integer", "optional": false},
+    "writerQueueSize": {"type": "integer", "optional": false},
     "writerBatchSize": {"type": "integer", "optional": false}
   }
 }
@@ -58,6 +57,8 @@ Gobbler endpoints all accept and return JSON.
   
 - `gobbler/definition/list` -> lists current item definitions
   
+- `gobbler/definition/names` -> returns a lightweight JSON array of registered type name strings (without full definition details)
+
 - `gobbler/definition/remove` -> removes existing item definition. If the pipeline has been started, the operation stops the corresponding writer, which flushes the current file before closing it, removes the writer and the corresponding worker, removes the type from the routing table, and finally removes the definition.
 
 **pipeline** group:
@@ -90,7 +91,7 @@ type Config struct {
 - `gobbler/pipeline/rotate` -> tells specific type writer to flush, close and rotate its file/blob. used to enable access to the last/active file/blob. 
   
 
-- `gobbler/pipeline/status` -> provides basic statistics of the pipeline (details tbd)
+- `gobbler/pipeline/status` -> returns pipeline status including: `configured` (bool), `running` (bool), `registeredDefinitions` (int); when configured also `mode`, `writerQueueSize`, `writerBatchSize`; when running also a `writers` map per type with `itemsInBuffer`, `itemsWritten`, `lastFlush`, `currentOutput`. See [`docs/REST-commands.md`](REST-commands.md) for the full response shape.
 
 **ingest** group of one:
 
@@ -99,3 +100,5 @@ type Config struct {
 - If a partial rout ends with "/" and no arguments, like gobbler/pipeline/, it is a request for description of the next element(s) of the rout so gobbler/pipeline/ should return information about four pipeline operations: start, stop, rotate and status.
 
 - If a complete route, e.g. gobbler/pipeline/start/ ends with "/" and no arguments, the server should return short description of the gobbler pipeline start command, the JSON object that should be passed to it (if any), and what will be returned (based on the implementation of the command)
+
+**For detailed definitions of all REST commands see `docs\REST-commands.md`**

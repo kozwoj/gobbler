@@ -18,4 +18,12 @@ type Config struct {
 	AccountKey      string // blob mode only
 	WriterQueueSize int
 	WriterBatchSize int
+
+	// Optional self-logging: when LoggerEndpoint is non-empty the server
+	// constructs a gobbler-client that ships its own operational events to a
+	// separate Gobbler instance for analysis.
+	LoggerEndpoint      string   // URL of the receiving Gobbler server, e.g. "http://host:8080"
+	LoggerTypes         []string // item type names the logger will emit
+	LoggerBatchSize     int      // client batch size; 0 means use client default (100)
+	LoggerFlushInterval string   // Go duration string, e.g. "30s"; "" means use client default (10s)
 }

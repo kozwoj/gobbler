@@ -50,6 +50,11 @@ func (s *Server) handlePipelineConfigure(w http.ResponseWriter, r *http.Request)
 		AccountKey      string `json:"accountKey"`
 		WriterQueueSize int    `json:"writerQueueSize"`
 		WriterBatchSize int    `json:"writerBatchSize"`
+		// Optional self-logging client configuration.
+		LoggerEndpoint      string   `json:"loggerEndpoint"`
+		LoggerTypes         []string `json:"loggerTypes"`
+		LoggerBatchSize     int      `json:"loggerBatchSize"`
+		LoggerFlushInterval string   `json:"loggerFlushInterval"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sendError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
@@ -73,12 +78,16 @@ func (s *Server) handlePipelineConfigure(w http.ResponseWriter, r *http.Request)
 	}
 
 	cfg := &pipeline.Config{
-		Mode:            pipeline.StorageMode(req.Mode),
-		OutputDir:       req.OutputDir,
-		AccountName:     req.AccountName,
-		AccountKey:      req.AccountKey,
-		WriterQueueSize: req.WriterQueueSize,
-		WriterBatchSize: req.WriterBatchSize,
+		Mode:                pipeline.StorageMode(req.Mode),
+		OutputDir:           req.OutputDir,
+		AccountName:         req.AccountName,
+		AccountKey:          req.AccountKey,
+		WriterQueueSize:     req.WriterQueueSize,
+		WriterBatchSize:     req.WriterBatchSize,
+		LoggerEndpoint:      req.LoggerEndpoint,
+		LoggerTypes:         req.LoggerTypes,
+		LoggerBatchSize:     req.LoggerBatchSize,
+		LoggerFlushInterval: req.LoggerFlushInterval,
 	}
 
 	s.mu.Lock()
@@ -231,12 +240,16 @@ func (s *Server) handlePipelineConfigureHelp(w http.ResponseWriter, r *http.Requ
 		"method":      "POST",
 		"endpoint":    "/gobbler/pipeline/configure",
 		"input": map[string]string{
-			"mode":            `"file" or "blob"`,
-			"outputDir":       "string - required when mode is \"file\"",
-			"accountName":     "string - required when mode is \"blob\"",
-			"accountKey":      "string - required when mode is \"blob\"",
-			"workerQueueSize": "integer",
-			"batchSize":       "integer",
+			"mode":                `"file" or "blob"`,
+			"outputDir":           "string - required when mode is \"file\"",
+			"accountName":         "string - required when mode is \"blob\"",
+			"accountKey":          "string - required when mode is \"blob\"",
+			"writerQueueSize":     "integer",
+			"writerBatchSize":     "integer",
+			"loggerEndpoint":      "string - optional; URL of a Gobbler server to receive this server's operational events",
+			"loggerTypes":         "array of strings - optional; item type names the logger will emit",
+			"loggerBatchSize":     "integer - optional; client batch size (default 100)",
+			"loggerFlushInterval": "string - optional; Go duration e.g. \"30s\" (default 10s)",
 		},
 		"returns": `{"status": "ok"} or {"error": "..."}`,
 	})

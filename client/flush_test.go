@@ -35,13 +35,7 @@ func newFakeIngest(t *testing.T, statusCode int, responseBody string, captured *
 // The client is automatically closed via t.Cleanup.
 func clientPointing(t *testing.T, srv *httptest.Server, types ...string) *realClient {
 	t.Helper()
-	c, err := New(srv.URL, WithTypes(types...), WithBatchSize(100), WithFlushInterval(time.Hour))
-	if err != nil {
-		t.Fatalf("New() error: %v", err)
-	}
-	rc := c.(*realClient)
-	t.Cleanup(func() { _ = rc.Close() })
-	return rc
+	return newDirect(t, srv.URL, WithTypes(types...), WithBatchSize(100), WithFlushInterval(time.Hour))
 }
 
 // --- Serialisation ---
@@ -242,9 +236,7 @@ func TestFlush_503_HoldBuffer(t *testing.T) {
 
 func TestFlush_NetworkError_HoldBuffer(t *testing.T) {
 	// Point at a URL that refuses connections.
-	rc, _ := New("http://127.0.0.1:1", WithTypes("alpha"), WithBatchSize(100), WithMaxFlushRetries(10), WithFlushInterval(time.Hour))
-	rcc := rc.(*realClient)
-	defer rc.Close()
+	rc := newDirect(t, "http://127.0.0.1:1", WithTypes("alpha"), WithBatchSize(100), WithMaxFlushRetries(10), WithFlushInterval(time.Hour))
 	_ = rc.Log("alpha", map[string]any{"a": 1})
 
 	err := rc.Flush()
@@ -252,9 +244,9 @@ func TestFlush_NetworkError_HoldBuffer(t *testing.T) {
 		t.Fatal("Flush() with no server returned nil, want error")
 	}
 
-	rcc.mu.Lock()
-	n := len(rcc.buf)
-	rcc.mu.Unlock()
+	rc.mu.Lock()
+	n := len(rc.buf)
+	rc.mu.Unlock()
 	if n != 1 {
 		t.Errorf("buffer after network error = %d, want 1 (held for retry)", n)
 	}
@@ -355,9 +347,8 @@ func TestFlush_FailureCounter_ResetOnSuccess(t *testing.T) {
 // --- Buffer cap ---
 
 func TestLog_BufferCap_ServerHealthy_ReturnsErrBufferFull(t *testing.T) {
-	// No server needed — batchSize=100 means no flush is triggered for 2 items.
-	rc, _ := New("http://127.0.0.1:1", WithTypes("alpha"), WithBatchSize(100), WithMaxBufSize(2), WithFlushInterval(time.Hour))
-	defer rc.Close()
+	// batchSize=100 means no flush is triggered for 2 items; unreachable URL is never contacted.
+	rc := newDirect(t, "http://127.0.0.1:1", WithTypes("alpha"), WithBatchSize(100), WithMaxBufSize(2), WithFlushInterval(time.Hour))
 
 	_ = rc.Log("alpha", map[string]any{"i": 0})
 	_ = rc.Log("alpha", map[string]any{"i": 1})
@@ -373,8 +364,7 @@ func TestLog_BufferCap_ServerDown_ReturnsErrBufferFullServerDown(t *testing.T) {
 	defer srv.Close()
 
 	// batchSize=1 so first Log triggers a flush that fails → failureCount=1.
-	rc, _ := New(srv.URL, WithTypes("alpha"), WithBatchSize(1), WithMaxBufSize(5), WithMaxFlushRetries(10), WithFlushInterval(time.Hour))
-	defer rc.Close()
+	rc := newDirect(t, srv.URL, WithTypes("alpha"), WithBatchSize(1), WithMaxBufSize(5), WithMaxFlushRetries(10), WithFlushInterval(time.Hour))
 
 	// First Log: crosses threshold → flush → 500 → failureCount=1, buf held.
 	_ = rc.Log("alpha", map[string]any{"i": 0})

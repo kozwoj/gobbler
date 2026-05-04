@@ -271,3 +271,59 @@ a parameter file or environment variables so it is safe to commit without secret
   (e.g. in `pipeline/status`)? Or silently swallowed? Surfacing them in status
   connects back to the diagnostic events design (see `gobbler-client.md` open
   questions).
+
+---
+
+## Implementation steps (phase 2 — instrumenting Gobbler)
+
+These steps follow the completion of the gobbler-client SDK (see
+[`docs/client-implementation-steps.md`](client-implementation-steps.md)).
+
+### Step 1 — Wire logger into server lifecycle
+
+- Add a `logger gobblerclient.Client` field to `Server`; initialise to `gobblerclient.Nop()` in `NewServer`.
+- In `handlePipelineStart`: when `s.config.LoggerEndpoint != ""`, parse `LoggerFlushInterval` with `time.ParseDuration` (empty string → client default 10s), then call `gobblerclient.New(endpoint, WithTypes(loggerTypes...), WithBatchSize(loggerBatchSize), WithFlushInterval(interval))`. On failure return 500 — the operator must fix the target logger server before starting.
+- In `handlePipelineStop`: call `s.logger.Close()`, reset `s.logger = gobblerclient.Nop()`.
+- Because `s.logger` is always a valid `Client` (real or Nop), no `if loggerEnabled` guards are needed at any call site.
+
+**Test**: `handlePipelineStart` constructs a real client when endpoint is set; uses Nop when absent; returns 500 when endpoint is unreachable; `handlePipelineStop` closes the logger.
+
+---
+
+### Step 2 — Instrument ingest handler
+
+- In `handleIngest`, record start time before processing. After `sendJSON`, call:
+  ```go
+  s.logger.Log("gobbler-ingest-event", map[string]any{
+      "requestId":  middleware.GetReqID(r.Context()),
+      "itemsIn":    len(inputItems) + len(parseErrors),
+      "ingested":   ingested,
+      "rejected":   len(rejected),
+      "statusCode": 200,
+      "durationMs": time.Since(start).Milliseconds(),
+  })
+  ```
+- Also emit on the 400 paths (empty array, invalid JSON) with appropriate `statusCode` and zero `ingested`.
+
+**Test**: fake logger client captures Log calls; verify field values for clean and partial-rejection responses.
+
+---
+
+### Step 3 — Instrument writers
+
+`FileWriter` and `BlobWriter` need access to the logger. Pass it as a parameter to the writer constructor (or add a `SetLogger` method called from `startType`).
+
+- After a successful flush emit `gobbler-writer-flush`.
+- On any flush/open/rotate error, replace the existing `fmt.Println` with a `gobbler-writer-error` Log call (and optionally keep a `log.Printf` for local visibility).
+
+**Test**: writer unit tests with a captured logger verify flush/error events are emitted with correct fields.
+
+---
+
+### Step 4 — Instrument pipeline lifecycle handlers
+
+- `handlePipelineStart` (on success, after `s.running = true`): emit `gobbler-pipeline-event` `{"event": "start"}`.
+- `handlePipelineStop` (on success, before `s.logger.Close()`): emit `gobbler-pipeline-event` `{"event": "stop"}`.
+- `handlePipelineRotate` (on success): emit `gobbler-pipeline-event` `{"event": "rotate", "itemType": req.TypeName}`.
+
+**Test**: verify events emitted via captured logger in existing pipeline handler tests.
