@@ -162,11 +162,11 @@ func (w *BlobWriter) flush() {
 			w.accountName, w.container, blobName)
 		client, err := appendblob.NewClientWithSharedKeyCredential(blobURL, w.cred, nil)
 		if err != nil {
-			_ = w.logger.Log("gobbler-writer-error", map[string]any{"typeName": w.typeName, "operation": "create-client", "error": err.Error()})
+			_ = w.logger.Log("gobbler-writer-error", map[string]any{"itemType": w.typeName, "operation": "create-client", "errorMsg": err.Error()})
 			return
 		}
 		if _, err = client.Create(ctx, nil); err != nil {
-			_ = w.logger.Log("gobbler-writer-error", map[string]any{"typeName": w.typeName, "operation": "create-blob", "error": err.Error()})
+			_ = w.logger.Log("gobbler-writer-error", map[string]any{"itemType": w.typeName, "operation": "create-blob", "errorMsg": err.Error()})
 			return
 		}
 		w.blobClient = client
@@ -174,12 +174,12 @@ func (w *BlobWriter) flush() {
 	}
 	payload := strings.Join(w.buffer, "\n") + "\n"
 	if _, err := w.blobClient.AppendBlock(ctx, readSeekCloser{strings.NewReader(payload)}, nil); err != nil {
-		_ = w.logger.Log("gobbler-writer-error", map[string]any{"typeName": w.typeName, "operation": "append-block", "error": err.Error()})
+		_ = w.logger.Log("gobbler-writer-error", map[string]any{"itemType": w.typeName, "operation": "append-block", "errorMsg": err.Error()})
 		return
 	}
 	itemsCount := len(w.buffer)
 	w.itemsWritten += int64(itemsCount)
 	w.lastFlush = time.Now()
 	w.buffer = nil
-	_ = w.logger.Log("gobbler-writer-flush", map[string]any{"typeName": w.typeName, "itemsFlushed": itemsCount, "output": w.currentBlob})
+	_ = w.logger.Log("gobbler-writer-flush", map[string]any{"itemType": w.typeName, "itemsFlushed": itemsCount, "output": w.currentBlob})
 }

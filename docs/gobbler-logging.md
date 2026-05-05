@@ -101,8 +101,7 @@ rules and can be changed to match your storage layout.
   "orderedColumns": [
     { "name": "itemType",     "type": "string", "optional": false },
     { "name": "output",       "type": "string", "optional": true  },
-    { "name": "itemsFlushed", "type": "int",    "optional": false },
-    { "name": "durationMs",   "type": "int",    "optional": false }
+    { "name": "itemsFlushed", "type": "int",    "optional": false }
   ]
 }
 ```

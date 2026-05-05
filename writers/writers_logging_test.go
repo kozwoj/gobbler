@@ -102,8 +102,8 @@ func TestWL1_FileWriter_FlushEvent(t *testing.T) {
 	if !ok {
 		t.Fatal("expected gobbler-writer-flush log call, got none")
 	}
-	if call.fields["typeName"] != "alpha" {
-		t.Errorf("typeName = %v, want alpha", call.fields["typeName"])
+	if call.fields["itemType"] != "alpha" {
+		t.Errorf("itemType = %v, want alpha", call.fields["itemType"])
 	}
 	if call.fields["itemsFlushed"] != 1 {
 		t.Errorf("itemsFlushed = %v, want 1", call.fields["itemsFlushed"])
@@ -181,11 +181,11 @@ func TestWL4_FileWriter_OpenFileError(t *testing.T) {
 	if call.fields["operation"] != "open-file" {
 		t.Errorf("operation = %v, want open-file", call.fields["operation"])
 	}
-	if call.fields["typeName"] != "alpha" {
-		t.Errorf("typeName = %v, want alpha", call.fields["typeName"])
+	if call.fields["itemType"] != "alpha" {
+		t.Errorf("itemType = %v, want alpha", call.fields["itemType"])
 	}
-	if call.fields["error"] == "" {
-		t.Error("error field is empty")
+	if call.fields["errorMsg"] == "" {
+		t.Error("errorMsg field is empty")
 	}
 }
 
