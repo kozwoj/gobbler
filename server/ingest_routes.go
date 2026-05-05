@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/kozwoj/gobbler/items"
 	"github.com/kozwoj/gobbler/pipeline"
 )
@@ -29,6 +30,8 @@ func (s *Server) handleIngestDiscovery(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		sendError(w, http.StatusBadRequest, "could not read request body")
@@ -57,6 +60,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	// 400: body is not a JSON array at all.
 	if len(parseErrors) > 0 && errors.Is(parseErrors[0], items.ErrInvalidJSONArray) {
 		sendError(w, http.StatusBadRequest, parseErrors[0].Error())
+		s.logIngestEvent(r, 0, 0, 1, http.StatusBadRequest, start)
 		return
 	}
 	// 400: array was valid JSON but contained nothing parseable (empty array,
@@ -64,6 +68,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	if len(inputItems) == 0 {
 		if len(parseErrors) == 0 {
 			sendError(w, http.StatusBadRequest, "empty input array")
+			s.logIngestEvent(r, 0, 0, 0, http.StatusBadRequest, start)
 			return
 		}
 		msgs := make([]string, len(parseErrors))
@@ -71,6 +76,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 			msgs[i] = pe.Error()
 		}
 		sendError(w, http.StatusBadRequest, "no valid items in input: "+strings.Join(msgs, "; "))
+		s.logIngestEvent(r, len(parseErrors), 0, len(parseErrors), http.StatusBadRequest, start)
 		return
 	}
 
@@ -120,5 +126,22 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, map[string]interface{}{
 		"ingested": ingested,
 		"rejected": rejected,
+	})
+	s.logIngestEvent(r, len(inputItems)+len(parseErrors), ingested, len(rejected), http.StatusOK, start)
+}
+
+// logIngestEvent emits a gobbler-ingest-event to the self-logger.
+// It is a no-op when the logger is Nop (logger not configured or failed to start).
+func (s *Server) logIngestEvent(r *http.Request, itemsIn, ingested, rejected, statusCode int, start time.Time) {
+	s.mu.RLock()
+	logger := s.logger
+	s.mu.RUnlock()
+	_ = logger.Log("gobbler-ingest-event", map[string]any{
+		"requestId":  middleware.GetReqID(r.Context()),
+		"itemsIn":    itemsIn,
+		"ingested":   ingested,
+		"rejected":   rejected,
+		"statusCode": statusCode,
+		"durationMs": time.Since(start).Milliseconds(),
 	})
 }
