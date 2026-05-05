@@ -85,15 +85,14 @@ Here is a proposed step-by-step implementation plan, ordered so each step is ind
 
 ---
 
-### Step 9 — Integration test against a real Gobbler server
-- Add an integration test (build-tag `//go:build integration`) that:
-  - Starts a real `server.Server` in-process
-  - Registers a type definition and starts the pipeline
-  - Constructs a client with `New()`
-  - Logs items, calls `Flush()`, verifies the server received them via `pipeline/status` or stats
-  - Tests `SwapServer` between two in-process servers
+### ~~Step 9 — Integration test against a real Gobbler server~~ ✓ DONE
+- Added `server/integration_test.go` (`//go:build integration`, package `server`):
+  - `TestIntegration_I9_1_New_ValidatesRealServer` — `New()` succeeds against a running server with the type registered
+  - `TestIntegration_I9_2_LogFlush_ItemsReachServer` — logs 3 items, flushes, confirms via `pipeline/status` `itemsInBuffer ≥ 3`
+  - `TestIntegration_I9_3_SwapServer_RoutesToNewServer` — flushes to srv1, stops it, starts srv2, `SwapServer`, confirms items reach srv2
+- Note: test is in `server/` (not `client/`) to avoid circular import (gobbler already imports gobbler-client)
 
-**Test**: `go test -tags integration ./client/`
+**Run**: `go test -tags integration -run TestIntegration ./server/`
 
 ---
 

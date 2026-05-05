@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -42,17 +41,8 @@ func TestBlobG6_StopReconfigureRestart(t *testing.T) {
 		t.Errorf("expected 0 blobs after cycle 1 (no ingest), got %d", count)
 	}
 
-	// Reconfigure with batchSize=5 — small enough that 5 items trigger an immediate flush.
-	cfg2, _ := json.Marshal(map[string]interface{}{
-		"mode":            "blob",
-		"accountName":     sec.AccountName,
-		"accountKey":      sec.AccountKey,
-		"workerQueueSize": 200,
-		"batchSize":       5,
-	})
-	if w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure", string(cfg2)); w.Code != http.StatusOK {
-		t.Fatalf("reconfigure: %d %s", w.Code, w.Body.String())
-	}
+	// Reconfigure with writerBatchSize=5 — small enough that 5 items trigger an immediate flush.
+	configureBlobModeWithBatch(t, router, sec, 5)
 
 	// Cycle 2: definitions persist across stop — no need to re-add alpha.
 	if w := do(t, router, http.MethodPost, "/gobbler/pipeline/start", ""); w.Code != http.StatusOK {
