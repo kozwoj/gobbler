@@ -31,9 +31,9 @@ func (s *spyClient) Log(typeName string, fields map[string]any) error {
 	s.logs = append(s.logs, logCall{typeName: typeName, fields: fields})
 	return nil
 }
-func (s *spyClient) Flush() error               { return nil }
-func (s *spyClient) Close() error               { return nil }
-func (s *spyClient) SwapServer(string) error    { return nil }
+func (s *spyClient) Flush() error            { return nil }
+func (s *spyClient) Close() error            { return nil }
+func (s *spyClient) SwapServer(string) error { return nil }
 
 func (s *spyClient) last() (logCall, bool) {
 	s.mu.Lock()

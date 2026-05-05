@@ -96,9 +96,9 @@ func (w *FileWriter) Add(item pipeline.CSVitem) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.buffer = append(w.buffer, item.CSV)
-	   if len(w.buffer) >= w.writerBatchSize {
-		   w.flush()
-	   }
+	if len(w.buffer) >= w.writerBatchSize {
+		w.flush()
+	}
 }
 
 // Stats returns a point-in-time snapshot of the writer's operational state.
