@@ -169,6 +169,8 @@ func (s *Server) handlePipelineStart(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	_ = s.logger.Log("gobbler-pipeline-event", map[string]any{"event": "start"})
+
 	sendJSON(w, map[string]string{"status": "ok"})
 }
 
@@ -199,6 +201,7 @@ func (s *Server) handlePipelineStop(w http.ResponseWriter, r *http.Request) {
 	pipeline.Reset()
 
 	// Close the self-logger (flushes buffered items) and reset to Nop.
+	_ = s.logger.Log("gobbler-pipeline-event", map[string]any{"event": "stop"})
 	_ = s.logger.Close()
 	s.logger = gobblerclient.Nop()
 	s.loggerConfigured = false
@@ -231,6 +234,7 @@ func (s *Server) handlePipelineRotate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entry.writer.Rotate()
+	_ = s.logger.Log("gobbler-pipeline-event", map[string]any{"event": "rotate", "itemType": req.TypeName})
 	sendJSON(w, map[string]string{"status": "ok"})
 }
 
