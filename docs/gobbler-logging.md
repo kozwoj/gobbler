@@ -198,9 +198,11 @@ is used.
 - The logger is only meaningful while the pipeline is running; there is nothing
   to log when the pipeline is stopped.
 - Reuses the existing operator workflow: one configure call, one start call.
-- Validation of the logger target (running + types present) happens at configure
-  time, before any pipeline activity begins.
-- The client is `Close()`d automatically when `pipeline/stop` is called.
+- Validation of the logger target (running + types present) happens at start
+  time, immediately before pipeline workers are launched.
+- The client lifetime exactly matches the pipeline lifetime: constructed in
+  `pipeline/start`, `Close()`d in `pipeline/stop`, reset to `Nop()` after stop
+  so the logger can be reconfigured before the next start.
 
 **Logger server swap requires a dedicated endpoint.**
 `pipeline/configure` can set the initial logger target, but hot-swapping to a
@@ -220,26 +222,29 @@ stopped).
 
 ### Alternative: logger config in `pipeline/start` body (rejected)
 
-Rejected because `start` currently takes no body (adding one is a usage change)
-and validation would be deferred until start time rather than configure time.
+Rejected because `start` currently takes no body (adding one is a usage change).
+Logger config naturally belongs with the rest of the pipeline config in `pipeline/configure`.
 
 ---
 
 ## Logger client lifecycle inside the server
 
 ```
-pipeline/configure  →  gobblerclient.New(loggerEndpoint, WithTypes(...))
-                        validates: running=true AND all types present
-                        stores client on Server struct (or nopClient if absent/failed)
+pipeline/configure  →  stores logger config fields on Config struct only;
+                        no client constructed yet
 
-pipeline/start      →  logger client flush goroutine already running
-                        (started inside gobblerclient.New)
+pipeline/start      →  gobblerclient.New(loggerEndpoint, WithTypes(...))
+                        on success: s.logger = client, s.loggerErr = ""
+                        on failure: s.logger = Nop(), s.loggerErr = err.Error()
+                        pipeline/start always returns 200 regardless of logger outcome
 
-pipeline/stop       →  logger.Close()  — flushes buffer, stops goroutine
-                        replaces stored client with nopClient
+pipeline/stop       →  emit gobbler-pipeline-event{"stop"}
+                        logger.Close()  — flushes buffer, stops goroutine
+                        s.logger = gobblerclient.Nop(), s.loggerErr = ""
+                        (logger can now be reconfigured before next start)
 
-pipeline/configure  →  if reconfigured while running, Close old client first,
-  (again)              then construct new one
+pipeline/configure  →  just updates Config; if pipeline was stopped the old
+  (again)              client is already Nop(), so no extra cleanup needed
 ```
 
 ---
@@ -281,9 +286,14 @@ These steps follow the completion of the gobbler-client SDK (see
 
 ### Step 1 — Wire logger into server lifecycle
 
-- Add a `logger gobblerclient.Client` field to `Server`; initialise to `gobblerclient.Nop()` in `NewServer`.
-- In `handlePipelineStart`: when `s.config.LoggerEndpoint != ""`, parse `LoggerFlushInterval` with `time.ParseDuration` (empty string → client default 10s), then call `gobblerclient.New(endpoint, WithTypes(loggerTypes...), WithBatchSize(loggerBatchSize), WithFlushInterval(interval))`. On failure return 500 — the operator must fix the target logger server before starting.
-- In `handlePipelineStop`: call `s.logger.Close()`, reset `s.logger = gobblerclient.Nop()`.
+- Add a `logger gobblerclient.Client` field to `Server`; initialise to `gobblerclient.Nop()` in `New`.
+- Add a `loggerErr string` field to `Server` to hold the last logger start failure reason (empty = ok or not configured).
+- In `handlePipelineStart`: when `s.config.LoggerEndpoint != ""`, parse `LoggerFlushInterval` with `time.ParseDuration` (empty string → client default 10s), then call `gobblerclient.New(endpoint, WithTypes(loggerTypes...), WithBatchSize(loggerBatchSize), WithFlushInterval(interval))`. On failure store the error string in `s.loggerErr` and continue with `s.logger = gobblerclient.Nop()` — the pipeline still starts. On success clear `s.loggerErr`.
+- In `handlePipelineStop`: call `s.logger.Close()`, reset `s.logger = gobblerclient.Nop()`, clear `s.loggerErr`.
+- In `handlePipelineStatus`: always include a `logger` object when configured:
+  - Pipeline not running: `{"configured": s.config.LoggerEndpoint != ""}`
+  - Pipeline running, no error: `{"configured": true, "running": true}`
+  - Pipeline running, start failed: `{"configured": true, "running": false, "error": s.loggerErr}`
 - Because `s.logger` is always a valid `Client` (real or Nop), no `if loggerEnabled` guards are needed at any call site.
 
 **Test**: `handlePipelineStart` constructs a real client when endpoint is set; uses Nop when absent; returns 500 when endpoint is unreachable; `handlePipelineStop` closes the logger.

@@ -230,7 +230,7 @@ Returns the current status and statistics of the pipeline.
 }
 ```
 
-**Response — configured but not running:**
+**Response — configured but not running (no logger endpoint set):**
 
 ```json
 {
@@ -239,11 +239,26 @@ Returns the current status and statistics of the pipeline.
   "registeredDefinitions": 2,
   "mode": "file",
   "writerQueueSize": 100,
-  "writerBatchSize": 50
+  "writerBatchSize": 50,
+  "logger": { "configured": false }
 }
 ```
 
-**Response — running:**
+**Response — configured but not running (logger endpoint set):**
+
+```json
+{
+  "configured": true,
+  "running": false,
+  "registeredDefinitions": 2,
+  "mode": "file",
+  "writerQueueSize": 100,
+  "writerBatchSize": 50,
+  "logger": { "configured": true }
+}
+```
+
+**Response — running, logger started successfully:**
 
 ```json
 {
@@ -253,6 +268,7 @@ Returns the current status and statistics of the pipeline.
   "mode": "file",
   "writerQueueSize": 100,
   "writerBatchSize": 50,
+  "logger": { "configured": true, "running": true },
   "writers": {
     "alpha": {
       "itemsInBuffer": 12,
@@ -270,8 +286,24 @@ Returns the current status and statistics of the pipeline.
 }
 ```
 
+**Response — running, logger failed to start (pipeline started anyway):**
+
+```json
+{
+  "configured": true,
+  "running": true,
+  "registeredDefinitions": 2,
+  "mode": "file",
+  "writerQueueSize": 100,
+  "writerBatchSize": 50,
+  "logger": { "configured": true, "running": false, "error": "gobblerclient: server not running at http://logger:8080" },
+  "writers": { ... }
+}
+```
+
 Always present fields: `configured` (bool), `running` (bool), `registeredDefinitions` (int).
-Present when configured: `mode`, `writerQueueSize`, `writerBatchSize`.
+Present when configured: `mode`, `writerQueueSize`, `writerBatchSize`, `logger` object.
+`logger` fields: `configured` (bool — whether `loggerEndpoint` was set in the last configure call); `running` (bool — present when pipeline is running, true if the client started successfully); `error` (string — present when pipeline is running and logger failed to start, persists until `pipeline/stop`).
 Present when running: `writers` map keyed by type name, each with `itemsInBuffer`, `itemsWritten`, `lastFlush`, `currentOutput`.
 
 ---
