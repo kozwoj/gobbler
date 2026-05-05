@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	gobblerclient "github.com/kozwoj/gobbler-client"
 	"github.com/kozwoj/gobbler/items"
 	"github.com/kozwoj/gobbler/pipeline"
 )
@@ -29,6 +30,7 @@ type FileWriter struct {
 	itemsWritten    int64
 	lastFlush       time.Time
 	mu              sync.Mutex
+	logger          gobblerclient.Client // always non-nil; Nop() when not configured
 }
 
 // NewFileWriter creates a FileWriter for the given definition rooted at rootDir.
@@ -48,7 +50,16 @@ func NewFileWriter(rootDir string, def items.ItemDefinition, writerBatchSize int
 		writerBatchSize: writerBatchSize,
 		maxAge:          maxAge,
 		typeName:        def.TypeName,
+		logger:          gobblerclient.Nop(),
 	}, nil
+}
+
+// SetLogger injects a self-logging client into the writer. Must be called before
+// Start. Safe to call concurrently; acquires the writer mutex.
+func (w *FileWriter) SetLogger(l gobblerclient.Client) {
+	w.mu.Lock()
+	w.logger = l
+	w.mu.Unlock()
 }
 
 // Start launches the time-based flush goroutine. Call once before routing items here.
@@ -118,18 +129,21 @@ func (w *FileWriter) Rotate() {
 			fname := fmt.Sprintf("%s_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"), w.typeName)
 			f, err := os.OpenFile(filepath.Join(w.outputDir, fname), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 			if err != nil {
-				fmt.Println("writers: FileWriter: Rotate: open file:", err)
+				_ = w.logger.Log("gobbler-writer-error", map[string]any{"typeName": w.typeName, "operation": "rotate-open-file", "error": err.Error()})
 				return
 			}
 			w.file = f
 		}
 		if _, err := w.file.WriteString(strings.Join(w.buffer, "\n") + "\n"); err != nil {
-			fmt.Println("writers: FileWriter: Rotate: write:", err)
+			_ = w.logger.Log("gobbler-writer-error", map[string]any{"typeName": w.typeName, "operation": "rotate-write", "error": err.Error()})
 			return
 		}
 		w.itemsWritten += int64(len(w.buffer))
 		w.lastFlush = time.Now()
+		output := w.file.Name()
+		itemsCount := len(w.buffer)
 		w.buffer = nil
+		_ = w.logger.Log("gobbler-writer-flush", map[string]any{"typeName": w.typeName, "itemsFlushed": itemsCount, "output": output})
 	}
 	if w.file != nil {
 		w.file.Close()
@@ -153,19 +167,19 @@ func (w *FileWriter) flush() {
 		fname := fmt.Sprintf("%s_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"), w.typeName)
 		f, err := os.OpenFile(filepath.Join(w.outputDir, fname), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
-			// TODO: replace with structured logging
-			fmt.Println("writers: FileWriter: open file:", err)
+			_ = w.logger.Log("gobbler-writer-error", map[string]any{"typeName": w.typeName, "operation": "open-file", "error": err.Error()})
 			return
 		}
 		w.file = f
 		w.fileStart = time.Now()
 	}
 	if _, err := w.file.WriteString(strings.Join(w.buffer, "\n") + "\n"); err != nil {
-		// TODO: replace with structured logging
-		fmt.Println("writers: FileWriter: write:", err)
+		_ = w.logger.Log("gobbler-writer-error", map[string]any{"typeName": w.typeName, "operation": "write-file", "error": err.Error()})
 		return
 	}
-	w.itemsWritten += int64(len(w.buffer))
+	itemsCount := len(w.buffer)
+	w.itemsWritten += int64(itemsCount)
 	w.lastFlush = time.Now()
 	w.buffer = nil
+	_ = w.logger.Log("gobbler-writer-flush", map[string]any{"typeName": w.typeName, "itemsFlushed": itemsCount, "output": w.file.Name()})
 }

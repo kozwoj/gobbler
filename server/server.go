@@ -104,6 +104,7 @@ func (s *Server) startType(def items.ItemDefinition) error {
 			cancel()
 			return fmt.Errorf("start type %s: %w", def.TypeName, err)
 		}
+		fw.SetLogger(s.logger)
 		w = fw
 	case pipeline.StorageModeBlob:
 		bw, err := writers.NewBlobWriter(pipeline.BlobConfig{
@@ -114,6 +115,7 @@ func (s *Server) startType(def items.ItemDefinition) error {
 			cancel()
 			return fmt.Errorf("start type %s: %w", def.TypeName, err)
 		}
+		bw.SetLogger(s.logger)
 		w = bw
 	default:
 		cancel()

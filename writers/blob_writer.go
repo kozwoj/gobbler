@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/appendblob"
 
+	gobblerclient "github.com/kozwoj/gobbler-client"
 	"github.com/kozwoj/gobbler/items"
 	"github.com/kozwoj/gobbler/pipeline"
 )
@@ -39,6 +40,7 @@ type BlobWriter struct {
 	lastFlush       time.Time
 	currentBlob     string
 	mu              sync.Mutex
+	logger          gobblerclient.Client // always non-nil; Nop() when not configured
 }
 
 // NewBlobWriter creates a BlobWriter for the given definition and blob credentials.
@@ -74,7 +76,16 @@ func NewBlobWriter(cfg pipeline.BlobConfig, def items.ItemDefinition, writerBatc
 		writerBatchSize: writerBatchSize,
 		maxAge:          maxAge,
 		typeName:        def.TypeName,
+		logger:          gobblerclient.Nop(),
 	}, nil
+}
+
+// SetLogger injects a self-logging client into the writer. Must be called before
+// Start. Safe to call concurrently; acquires the writer mutex.
+func (w *BlobWriter) SetLogger(l gobblerclient.Client) {
+	w.mu.Lock()
+	w.logger = l
+	w.mu.Unlock()
 }
 
 // Start launches the time-based flush goroutine. Call once before routing items here.
@@ -151,13 +162,11 @@ func (w *BlobWriter) flush() {
 			w.accountName, w.container, blobName)
 		client, err := appendblob.NewClientWithSharedKeyCredential(blobURL, w.cred, nil)
 		if err != nil {
-			// TODO: replace with structured logging
-			fmt.Println("writers: BlobWriter: create client:", err)
+			_ = w.logger.Log("gobbler-writer-error", map[string]any{"typeName": w.typeName, "operation": "create-client", "error": err.Error()})
 			return
 		}
 		if _, err = client.Create(ctx, nil); err != nil {
-			// TODO: replace with structured logging
-			fmt.Println("writers: BlobWriter: create blob:", err)
+			_ = w.logger.Log("gobbler-writer-error", map[string]any{"typeName": w.typeName, "operation": "create-blob", "error": err.Error()})
 			return
 		}
 		w.blobClient = client
@@ -165,11 +174,12 @@ func (w *BlobWriter) flush() {
 	}
 	payload := strings.Join(w.buffer, "\n") + "\n"
 	if _, err := w.blobClient.AppendBlock(ctx, readSeekCloser{strings.NewReader(payload)}, nil); err != nil {
-		// TODO: replace with structured logging
-		fmt.Println("writers: BlobWriter: append:", err)
+		_ = w.logger.Log("gobbler-writer-error", map[string]any{"typeName": w.typeName, "operation": "append-block", "error": err.Error()})
 		return
 	}
-	w.itemsWritten += int64(len(w.buffer))
+	itemsCount := len(w.buffer)
+	w.itemsWritten += int64(itemsCount)
 	w.lastFlush = time.Now()
 	w.buffer = nil
+	_ = w.logger.Log("gobbler-writer-flush", map[string]any{"typeName": w.typeName, "itemsFlushed": itemsCount, "output": w.currentBlob})
 }
