@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	gobblerclient "github.com/kozwoj/gobbler-client"
 	"github.com/kozwoj/gobbler/pipeline"
 )
 
@@ -141,6 +143,32 @@ func (s *Server) handlePipelineStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.running = true
+
+	// Construct the self-logger. Soft failure: the pipeline always starts even
+	// if gobblerclient.New() fails (e.g. logger server unreachable / types missing).
+	s.loggerConfigured = s.config.LoggerEndpoint != ""
+	if s.loggerConfigured {
+		opts := []gobblerclient.Option{
+			gobblerclient.WithTypes(s.config.LoggerTypes...),
+		}
+		if s.config.LoggerBatchSize > 0 {
+			opts = append(opts, gobblerclient.WithBatchSize(s.config.LoggerBatchSize))
+		}
+		if s.config.LoggerFlushInterval != "" {
+			if d, err := time.ParseDuration(s.config.LoggerFlushInterval); err == nil {
+				opts = append(opts, gobblerclient.WithFlushInterval(d))
+			}
+		}
+		client, err := gobblerclient.New(s.config.LoggerEndpoint, opts...)
+		if err != nil {
+			s.loggerErr = err.Error()
+			s.logger = gobblerclient.Nop()
+		} else {
+			s.loggerErr = ""
+			s.logger = client
+		}
+	}
+
 	sendJSON(w, map[string]string{"status": "ok"})
 }
 
@@ -169,6 +197,12 @@ func (s *Server) handlePipelineStop(w http.ResponseWriter, r *http.Request) {
 		entry.wg.Wait()
 	}
 	pipeline.Reset()
+
+	// Close the self-logger (flushes buffered items) and reset to Nop.
+	_ = s.logger.Close()
+	s.logger = gobblerclient.Nop()
+	s.loggerConfigured = false
+	s.loggerErr = ""
 
 	sendJSON(w, map[string]string{"status": "ok"})
 }
@@ -214,6 +248,21 @@ func (s *Server) handlePipelineStatus(w http.ResponseWriter, r *http.Request) {
 		status["mode"] = string(s.config.Mode)
 		status["writerQueueSize"] = s.config.WriterQueueSize
 		status["writerBatchSize"] = s.config.WriterBatchSize
+
+		// logger sub-object: present when a logger endpoint is configured or was configured
+		// at last start.
+		if s.config.LoggerEndpoint != "" || s.loggerConfigured {
+			loggerObj := map[string]interface{}{
+				"configured": s.config.LoggerEndpoint != "" || s.loggerConfigured,
+			}
+			if s.running {
+				loggerObj["running"] = s.loggerErr == ""
+				if s.loggerErr != "" {
+					loggerObj["error"] = s.loggerErr
+				}
+			}
+			status["logger"] = loggerObj
+		}
 	}
 
 	if s.running {

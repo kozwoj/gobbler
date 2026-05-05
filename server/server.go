@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	gobblerclient "github.com/kozwoj/gobbler-client"
 	"github.com/kozwoj/gobbler/items"
 	"github.com/kozwoj/gobbler/pipeline"
 	"github.com/kozwoj/gobbler/writers"
@@ -47,6 +48,11 @@ type Server struct {
 
 	// active type entries — populated when the pipeline is started
 	types map[pipeline.ItemType]*typeEntry
+
+	// self-logging — always non-nil; Nop() when logging is not configured or failed
+	logger           gobblerclient.Client
+	loggerConfigured bool   // true if LoggerEndpoint was set at the last start
+	loggerErr        string // non-empty if gobblerclient.New() failed; cleared on stop
 }
 
 // New creates a Server ready to accept configuration.
@@ -54,6 +60,7 @@ func New() *Server {
 	return &Server{
 		definitions: make(items.DefinitionList),
 		types:       make(map[pipeline.ItemType]*typeEntry),
+		logger:      gobblerclient.Nop(),
 	}
 }
 
