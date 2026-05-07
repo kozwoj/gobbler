@@ -97,6 +97,26 @@ func (g *AlphaGenerator) GenerateJSONArray(count int) (string, error) {
 	return string(jsonData), nil
 }
 
+// NewAlphaGeneratorWithRand creates an AlphaGenerator backed by the provided rand.Rand.
+func NewAlphaGeneratorWithRand(r *rand.Rand) *AlphaGenerator {
+	return &AlphaGenerator{rand: r}
+}
+
+// TypeName implements ItemGenerator.
+func (g *AlphaGenerator) TypeName() string { return "alpha" }
+
+// GenerateWrapped implements ItemGenerator.
+func (g *AlphaGenerator) GenerateWrapped() map[string]any {
+	item := g.GenerateItem()
+	return map[string]any{
+		"alpha": map[string]any{
+			"alphaStr":  item.AlphaStr,
+			"alphaInt":  item.AlphaInt,
+			"alphaDate": item.AlphaDate,
+		},
+	}
+}
+
 // generateRandomString creates a random string of specified length
 func (g *AlphaGenerator) generateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

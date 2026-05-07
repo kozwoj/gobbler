@@ -46,6 +46,8 @@ type ItemGenerator interface {
 }
 ```
 
+note: we should be able to customize each item generator to make the items more realistic. for example some of the string values can be taken for a string array, like rebootReason or shutdownReason in vm vm-shutdown and vm-reboot. 
+
 Selection: weighted random — each generation cycle picks a type proportionally to its weight (default weight 1 = equal distribution).
 
 Batch assembly: the Runner fills a `[]map[string]any` up to `batchSize` items, potentially mixing types in a single batch (valid per Gobbler's ingest contract).
@@ -75,5 +77,15 @@ Optional **`totalItems`** limit (0 = run until stopped via Ctrl-C).
 ## Open questions
 
 1. Should the generator also call `definition/add` to register types before ingesting, or assume they are pre-registered?
+- answer: the pipeline *configuration* (mode, outputDir, accountName, etc.) is done externally so it can vary per experiment.
+  The runner is responsible for:
+  - verifying the server is reachable and configured (`GET /gobbler/pipeline/status` → abort if `configured` is not `true` or pipeline is already running)
+  - registering item definitions (`POST /gobbler/definition/add`) for each requested type
+  - starting the pipeline (`POST /gobbler/pipeline/start`)
+  - stopping the pipeline (`POST /gobbler/pipeline/stop`) when done (or on interrupt)
+  
 2. Do we want per-type weight configuration on the CLI, or is equal distribution enough for now?
+- answer: for now we can have equal distribution
+
 3. Should the runner live in `tester/` (library) + `tester/cmd/` (main), or directly as a standalone `cmd/tester/` at the repo root?
+- answer: the runner should live in `tester/` directory in `tester/runner`. it should be similar to how blobtest is placed. 

@@ -83,6 +83,26 @@ func (g *BetaGenerator) GenerateJSONArray(count int) (string, error) {
 	return string(jsonData), nil
 }
 
+// NewBetaGeneratorWithRand creates a BetaGenerator backed by the provided rand.Rand.
+func NewBetaGeneratorWithRand(r *rand.Rand) *BetaGenerator {
+	return &BetaGenerator{rand: r}
+}
+
+// TypeName implements ItemGenerator.
+func (g *BetaGenerator) TypeName() string { return "beta" }
+
+// GenerateWrapped implements ItemGenerator.
+func (g *BetaGenerator) GenerateWrapped() map[string]any {
+	item := g.GenerateItem()
+	return map[string]any{
+		"beta": map[string]any{
+			"betaStr":  item.BetaStr,
+			"betaBool": item.BetaBool,
+			"betaReal": item.BetaReal,
+		},
+	}
+}
+
 // generateRandomString creates a random string of specified length
 func (g *BetaGenerator) generateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

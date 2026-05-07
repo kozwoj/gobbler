@@ -104,6 +104,30 @@ func (g *GammaGenerator) GenerateJSONArray(count int) (string, error) {
 	return string(jsonData), nil
 }
 
+// NewGammaGeneratorWithRand creates a GammaGenerator backed by the provided rand.Rand.
+func NewGammaGeneratorWithRand(r *rand.Rand) *GammaGenerator {
+	return &GammaGenerator{
+		rand:           r,
+		alphaGenerator: NewAlphaGeneratorWithRand(r),
+		betaGenerator:  NewBetaGeneratorWithRand(r),
+	}
+}
+
+// TypeName implements ItemGenerator.
+func (g *GammaGenerator) TypeName() string { return "gamma" }
+
+// GenerateWrapped implements ItemGenerator.
+func (g *GammaGenerator) GenerateWrapped() map[string]any {
+	item := g.GenerateItem()
+	return map[string]any{
+		"gamma": map[string]any{
+			"gammaInt":     item.GammaInt,
+			"gammaStr":     item.GammaStr,
+			"gammaDynamic": item.GammaDynamic,
+		},
+	}
+}
+
 // generateRandomString creates a random string of specified length
 func (g *GammaGenerator) generateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

@@ -3,7 +3,7 @@
 	{
 		"name": "allscalars",
 		"documentation": "table with all scalar types",
-		"folder": "folder-allscalars",
+		"folder": "allscalars-folder",
 		"latencyMinutes": 10,
 		"orderedColumns": [
 			{
@@ -51,7 +51,7 @@
 	{
 		"name": "somescalars",
 		"documentation": "table with selected scalar types",
-		"folder": "folder-somescalars",
+		"folder": "somescalars-folder",
 		"latencyMinutes": 10,
 		"orderedColumns": [
 			{
