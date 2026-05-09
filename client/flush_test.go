@@ -1,6 +1,7 @@
 package gobblerclient
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -49,7 +50,7 @@ func TestFlush_Serialisation(t *testing.T) {
 	_ = rc.Log("alpha", map[string]any{"x": 1})
 	_ = rc.Log("beta", map[string]any{"y": 2})
 
-	if err := rc.Flush(); err != nil {
+	if err := rc.Flush(context.Background()); err != nil {
 		t.Fatalf("Flush() error: %v", err)
 	}
 
@@ -77,7 +78,7 @@ func TestFlush_EmptyBuffer_NoRequest(t *testing.T) {
 
 	rc := clientPointing(t, srv, "alpha")
 	// Don't log anything — buffer is empty.
-	if err := rc.Flush(); err != nil {
+	if err := rc.Flush(context.Background()); err != nil {
 		t.Fatalf("Flush() on empty buffer returned error: %v", err)
 	}
 	if called {
@@ -94,7 +95,7 @@ func TestFlush_200_Clean_DrainBuffer(t *testing.T) {
 	rc := clientPointing(t, srv, "alpha")
 	_ = rc.Log("alpha", map[string]any{"a": 1})
 
-	if err := rc.Flush(); err != nil {
+	if err := rc.Flush(context.Background()); err != nil {
 		t.Fatalf("Flush() error: %v", err)
 	}
 
@@ -113,7 +114,7 @@ func TestFlush_200_EmptyRejectedArray_NoError(t *testing.T) {
 	rc := clientPointing(t, srv, "alpha")
 	_ = rc.Log("alpha", map[string]any{"a": 1})
 
-	if err := rc.Flush(); err != nil {
+	if err := rc.Flush(context.Background()); err != nil {
 		t.Errorf("Flush() with empty rejected array returned error: %v", err)
 	}
 }
@@ -128,7 +129,7 @@ func TestFlush_200_WithRejected_ReturnsError(t *testing.T) {
 	rc := clientPointing(t, srv, "alpha")
 	_ = rc.Log("alpha", map[string]any{"a": 1})
 
-	err := rc.Flush()
+	err := rc.Flush(context.Background())
 	if err == nil {
 		t.Fatal("Flush() with rejected items returned nil, want error")
 	}
@@ -144,7 +145,7 @@ func TestFlush_200_WithRejected_DrainBuffer(t *testing.T) {
 
 	rc := clientPointing(t, srv, "alpha")
 	_ = rc.Log("alpha", map[string]any{"a": 1})
-	_ = rc.Flush()
+	_ = rc.Flush(context.Background())
 
 	rc.mu.Lock()
 	n := len(rc.buf)
@@ -163,7 +164,7 @@ func TestFlush_400_ReturnsError(t *testing.T) {
 	rc := clientPointing(t, srv, "alpha")
 	_ = rc.Log("alpha", map[string]any{"a": 1})
 
-	err := rc.Flush()
+	err := rc.Flush(context.Background())
 	if err == nil {
 		t.Fatal("Flush() on 400 returned nil, want error")
 	}
@@ -175,7 +176,7 @@ func TestFlush_400_DrainBuffer(t *testing.T) {
 
 	rc := clientPointing(t, srv, "alpha")
 	_ = rc.Log("alpha", map[string]any{"a": 1})
-	_ = rc.Flush()
+	_ = rc.Flush(context.Background())
 
 	rc.mu.Lock()
 	n := len(rc.buf)
@@ -194,7 +195,7 @@ func TestFlush_500_ReturnsError(t *testing.T) {
 	rc := clientPointing(t, srv, "alpha")
 	_ = rc.Log("alpha", map[string]any{"a": 1})
 
-	err := rc.Flush()
+	err := rc.Flush(context.Background())
 	if err == nil {
 		t.Fatal("Flush() on 500 returned nil, want error")
 	}
@@ -206,7 +207,7 @@ func TestFlush_500_HoldBuffer(t *testing.T) {
 
 	rc := clientPointing(t, srv, "alpha")
 	_ = rc.Log("alpha", map[string]any{"a": 1})
-	_ = rc.Flush()
+	_ = rc.Flush(context.Background())
 
 	rc.mu.Lock()
 	n := len(rc.buf)
@@ -222,7 +223,7 @@ func TestFlush_503_HoldBuffer(t *testing.T) {
 
 	rc := clientPointing(t, srv, "alpha")
 	_ = rc.Log("alpha", map[string]any{"a": 1})
-	_ = rc.Flush()
+	_ = rc.Flush(context.Background())
 
 	rc.mu.Lock()
 	n := len(rc.buf)
@@ -239,7 +240,7 @@ func TestFlush_NetworkError_HoldBuffer(t *testing.T) {
 	rc := newDirect(t, "http://127.0.0.1:1", WithTypes("alpha"), WithBatchSize(100), WithMaxFlushRetries(10), WithFlushInterval(time.Hour))
 	_ = rc.Log("alpha", map[string]any{"a": 1})
 
-	err := rc.Flush()
+	err := rc.Flush(context.Background())
 	if err == nil {
 		t.Fatal("Flush() with no server returned nil, want error")
 	}
@@ -281,7 +282,7 @@ func TestFlush_FailureCounter_IncrementOn5xx(t *testing.T) {
 	rc.cfg.maxFlushRetries = 10
 
 	_ = rc.Log("alpha", map[string]any{"i": 0})
-	_ = rc.Flush()
+	_ = rc.Flush(context.Background())
 
 	rc.mu.Lock()
 	fc := rc.failureCount
@@ -298,9 +299,9 @@ func TestFlush_FailureCounter_DrainAfterMaxRetries(t *testing.T) {
 	rc.cfg.maxFlushRetries = 3
 
 	_ = rc.Log("alpha", map[string]any{"i": 0})
-	_ = rc.Flush() // failureCount=1, buf held
-	_ = rc.Flush() // failureCount=2, buf held
-	_ = rc.Flush() // failureCount=3 >= maxFlushRetries, buf drained, counter reset
+	_ = rc.Flush(context.Background()) // failureCount=1, buf held
+	_ = rc.Flush(context.Background()) // failureCount=2, buf held
+	_ = rc.Flush(context.Background()) // failureCount=3 >= maxFlushRetries, buf drained, counter reset
 
 	rc.mu.Lock()
 	n := len(rc.buf)
@@ -332,9 +333,9 @@ func TestFlush_FailureCounter_ResetOnSuccess(t *testing.T) {
 	rc.cfg.maxFlushRetries = 10
 
 	_ = rc.Log("alpha", map[string]any{"i": 0})
-	_ = rc.Flush() // attempt 1 → 500, failureCount=1
-	_ = rc.Flush() // attempt 2 → 500, failureCount=2
-	_ = rc.Flush() // attempt 3 → 200, failureCount=0
+	_ = rc.Flush(context.Background()) // attempt 1 → 500, failureCount=1
+	_ = rc.Flush(context.Background()) // attempt 2 → 500, failureCount=2
+	_ = rc.Flush(context.Background()) // attempt 3 → 200, failureCount=0
 
 	rc.mu.Lock()
 	fc := rc.failureCount

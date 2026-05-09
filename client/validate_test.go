@@ -1,6 +1,7 @@
 package gobblerclient
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -128,7 +129,7 @@ func TestNew_ValidServer_ReturnsRealClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
-	defer c.Close()
+	defer c.Close(context.Background())
 
 	if _, ok := c.(*realClient); !ok {
 		t.Errorf("New() returned %T, want *realClient", c)
@@ -177,10 +178,10 @@ func TestNew_NopIsUsable_NoNilGuardNeeded(t *testing.T) {
 	if err := c.Log("alpha", map[string]any{"x": 1}); err != nil {
 		t.Errorf("Nop.Log() returned error: %v", err)
 	}
-	if err := c.Flush(); err != nil {
+	if err := c.Flush(context.Background()); err != nil {
 		t.Errorf("Nop.Flush() returned error: %v", err)
 	}
-	if err := c.Close(); err != nil {
+	if err := c.Close(context.Background()); err != nil {
 		t.Errorf("Nop.Close() returned error: %v", err)
 	}
 }

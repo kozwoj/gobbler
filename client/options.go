@@ -1,6 +1,9 @@
 package gobblerclient
 
-import "time"
+import (
+	"net/http"
+	"time"
+)
 
 // Option is a functional option for configuring a Client.
 type Option func(*config)
@@ -12,6 +15,7 @@ type config struct {
 	flushInterval   time.Duration
 	maxBufSize      int
 	maxFlushRetries int
+	httpClient      *http.Client
 }
 
 // WithTypes registers the type names the client should log and are understood by the Gobbler server.
@@ -60,6 +64,16 @@ func WithMaxFlushRetries(n int) Option {
 	}
 }
 
+// WithHTTPClient sets the HTTP client used for all outbound requests: the
+// validation GETs in New and SwapServer, and every POST /gobbler/ingest in
+// Flush. Use this to configure TLS, a proxy, or a global request timeout.
+// Default: an http.Client with a 30-second timeout.
+func WithHTTPClient(hc *http.Client) Option {
+	return func(c *config) {
+		c.httpClient = hc
+	}
+}
+
 // defaultConfig returns a config with all defaults applied.
 func defaultConfig() config {
 	return config{
@@ -71,6 +85,7 @@ func defaultConfig() config {
 		// all options have been processed, so the caller's WithBatchSize is
 		// respected when computing the default cap.
 		maxBufSize: 0,
+		httpClient: &http.Client{Timeout: 15 * time.Second},
 	}
 }
 

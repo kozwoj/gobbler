@@ -1,6 +1,7 @@
 package gobblerclient
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -41,7 +42,7 @@ func TestSwapServer_SuccessfulSwap_RoutesFlushToNewServer(t *testing.T) {
 
 	// Log one item to srv1 and flush it.
 	_ = rc.Log("alpha", map[string]any{"x": 1})
-	_ = rc.Flush()
+	_ = rc.Flush(context.Background())
 
 	if *count1 != 1 {
 		t.Fatalf("expected 1 flush to srv1 before swap, got %d", *count1)
@@ -59,7 +60,7 @@ func TestSwapServer_SuccessfulSwap_RoutesFlushToNewServer(t *testing.T) {
 	}
 
 	_ = rc.Log("alpha", map[string]any{"x": 2})
-	_ = rc.Flush()
+	_ = rc.Flush(context.Background())
 
 	if *count2 == 0 {
 		t.Error("expected at least one flush to combined2 after swap, got 0")
@@ -84,7 +85,7 @@ func TestSwapServer_ValidationFails_KeepsOldServer(t *testing.T) {
 
 	// The client should still flush to the original server.
 	_ = rc.Log("alpha", map[string]any{"x": 1})
-	_ = rc.Flush()
+	_ = rc.Flush(context.Background())
 
 	if *count1 != 1 {
 		t.Errorf("srv1 hit count after failed swap = %d, want 1", *count1)
@@ -108,7 +109,7 @@ func TestSwapServer_ValidationFails_NotRunning_KeepsOldServer(t *testing.T) {
 
 	// Old server still receives flushes.
 	_ = rc.Log("alpha", map[string]any{"x": 1})
-	_ = rc.Flush()
+	_ = rc.Flush(context.Background())
 
 	if *count1 != 1 {
 		t.Errorf("srv1 hit count = %d, want 1", *count1)
@@ -131,7 +132,7 @@ func TestSwapServer_ValidationFails_MissingType_KeepsOldServer(t *testing.T) {
 	}
 
 	_ = rc.Log("alpha", map[string]any{"x": 1})
-	_ = rc.Flush()
+	_ = rc.Flush(context.Background())
 
 	if *count1 != 1 {
 		t.Errorf("srv1 hit count = %d, want 1", *count1)
@@ -154,7 +155,7 @@ func TestSwapServer_ConcurrentFlushAndSwap_Consistent(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			_ = rc.Log("alpha", map[string]any{"i": i})
-			_ = rc.Flush()
+			_ = rc.Flush(context.Background())
 		}(i)
 		if i%5 == 0 {
 			wg.Add(1)

@@ -1,7 +1,10 @@
 // Package gobblerclient provides a client for sending log items to a Gobbler server.
 package gobblerclient
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
 // ErrBufferFull is returned by Log when the buffer has reached its cap during
 // normal operation (server healthy, log rate exceeds flush throughput).
@@ -20,11 +23,11 @@ type Client interface {
 	Log(typeName string, fields map[string]any) error
 
 	// Flush sends all buffered items to the server now.
-	Flush() error
+	Flush(ctx context.Context) error
 
 	// Close flushes all remaining items and stops the background goroutine.
 	// Close is idempotent.
-	Close() error
+	Close(ctx context.Context) error
 
 	// SwapServer validates newURL as a Gobbler target (running + all registered
 	// types present) and, if valid, atomically replaces the current endpoint.

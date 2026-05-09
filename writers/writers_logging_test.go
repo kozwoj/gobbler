@@ -34,8 +34,8 @@ func (s *writerSpy) Log(typeName string, fields map[string]any) error {
 	s.logs = append(s.logs, writerLogCall{typeName: typeName, fields: fields})
 	return nil
 }
-func (s *writerSpy) Flush() error            { return nil }
-func (s *writerSpy) Close() error            { return nil }
+func (s *writerSpy) Flush(context.Context) error { return nil }
+func (s *writerSpy) Close(context.Context) error { return nil }
 func (s *writerSpy) SwapServer(string) error { return nil }
 
 func (s *writerSpy) first(typeName string) (writerLogCall, bool) {

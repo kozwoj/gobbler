@@ -1,5 +1,7 @@
 package gobblerclient
 
+import "context"
+
 // nopClient is a no-op implementation of Client. All methods return nil.
 type nopClient struct{}
 
@@ -12,11 +14,11 @@ func (n *nopClient) Log(typeName string, fields map[string]any) error {
 	return nil
 }
 
-func (n *nopClient) Flush() error {
+func (n *nopClient) Flush(ctx context.Context) error {
 	return nil
 }
 
-func (n *nopClient) Close() error {
+func (n *nopClient) Close(ctx context.Context) error {
 	return nil
 }
 

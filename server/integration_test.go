@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -96,7 +97,7 @@ func TestIntegration_I9_1_New_ValidatesRealServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
-	_ = c.Close()
+	_ = c.Close(context.Background())
 }
 
 // TestIntegration_I9_2_LogFlush_ItemsReachServer logs items via the client, calls
@@ -114,7 +115,7 @@ func TestIntegration_I9_2_LogFlush_ItemsReachServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
-	defer func() { _ = c.Close() }()
+	defer func() { _ = c.Close(context.Background()) }()
 
 	for i := 0; i < 3; i++ {
 		if err := c.Log("alpha", map[string]any{
@@ -126,7 +127,7 @@ func TestIntegration_I9_2_LogFlush_ItemsReachServer(t *testing.T) {
 		}
 	}
 
-	if err := c.Flush(); err != nil {
+	if err := c.Flush(context.Background()); err != nil {
 		t.Fatalf("Flush() error: %v", err)
 	}
 
@@ -167,7 +168,7 @@ func TestIntegration_I9_3_SwapServer_RoutesToNewServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() against srv1: %v", err)
 	}
-	defer func() { _ = c.Close() }()
+	defer func() { _ = c.Close(context.Background()) }()
 
 	// Log one item to srv1 and flush; verify it appears in srv1's buffer.
 	if err := c.Log("alpha", map[string]any{
@@ -177,7 +178,7 @@ func TestIntegration_I9_3_SwapServer_RoutesToNewServer(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Log to srv1: %v", err)
 	}
-	if err := c.Flush(); err != nil {
+	if err := c.Flush(context.Background()); err != nil {
 		t.Fatalf("Flush() to srv1: %v", err)
 	}
 	waitForItems(t, router1, "alpha", 1, time.Second)
@@ -223,7 +224,7 @@ func TestIntegration_I9_3_SwapServer_RoutesToNewServer(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Log to srv2: %v", err)
 	}
-	if err := c.Flush(); err != nil {
+	if err := c.Flush(context.Background()); err != nil {
 		t.Fatalf("Flush() to srv2: %v", err)
 	}
 	waitForItems(t, router2, "alpha", 1, time.Second)

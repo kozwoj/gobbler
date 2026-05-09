@@ -23,8 +23,12 @@ Content-Type: application/json
 ###
 GET http://localhost:8080/gobbler/pipeline/status
 
+# 8081 is the default for the Gobbler logger
 ###
-GET http://127.0.0.1:8080/gobbler/pipeline/status
+GET http://localhost:8081/gobbler/pipeline/status
+
+###
+GET http://192.168.254.32:8081/gobbler/pipeline/status
 
 ###
 POST http://localhost:8080/gobbler/pipeline/start

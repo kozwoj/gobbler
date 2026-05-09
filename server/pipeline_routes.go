@@ -202,7 +202,7 @@ func (s *Server) handlePipelineStop(w http.ResponseWriter, r *http.Request) {
 
 	// Close the self-logger (flushes buffered items) and reset to Nop.
 	_ = s.logger.Log("gobbler-pipeline-event", map[string]any{"event": "stop"})
-	_ = s.logger.Close()
+	_ = s.logger.Close(r.Context())
 	s.logger = gobblerclient.Nop()
 	s.loggerConfigured = false
 	s.loggerErr = ""

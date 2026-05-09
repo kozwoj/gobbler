@@ -20,10 +20,17 @@
     Per-type writer queue depth. Default: 100
 
 .EXAMPLE
-    .\setup-logger.ps1 -OutputDir C:\gobbler-logs
+    # Windows
+    .\setup-logger.ps1 -OutputDir C:\temp\gobbler-logs
+
+.EXAMPLE
+    # Linux / macOS
+    .\setup-logger.ps1 -OutputDir /tmp/gobbler-logs
+    .\setup-logger.ps1 -OutputDir /media/wojtek/SamsungSSD/temp/gobbler-logs
 
 .EXAMPLE
     .\setup-logger.ps1 -LoggerUrl http://localhost:9000 -OutputDir /tmp/gobbler-logs -BatchSize 100
+    .\setup-logger.ps1 -LoggerUrl http://localhost:9000 -OutputDir /media/wojtek/SamsungSSD/temp/gobbler-logs -BatchSize 100
 #>
 [CmdletBinding()]
 param(

@@ -1,6 +1,7 @@
 package gobblerclient
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,7 +31,7 @@ func newDirect(t *testing.T, serverURL string, opts ...Option) *realClient {
 		done:       make(chan struct{}),
 	}
 	rc.start()
-	t.Cleanup(func() { _ = rc.Close() })
+	t.Cleanup(func() { _ = rc.Close(context.Background()) })
 	return rc
 }
 
@@ -44,7 +45,7 @@ func TestRealClient_New_ReturnsClient(t *testing.T) {
 	if c == nil {
 		t.Fatal("New() returned nil client")
 	}
-	_ = c.Close()
+	_ = c.Close(context.Background())
 }
 
 func TestRealClient_Log_UnknownType_ReturnsError(t *testing.T) {
@@ -141,7 +142,7 @@ func TestRealClient_Flush_DrainBuffer(t *testing.T) {
 		_ = rc.Log("alpha", map[string]any{"i": i})
 	}
 
-	if err := rc.Flush(); err != nil {
+	if err := rc.Flush(context.Background()); err != nil {
 		t.Fatalf("Flush() error: %v", err)
 	}
 
@@ -161,7 +162,7 @@ func TestRealClient_Close_DrainBuffer(t *testing.T) {
 
 	_ = rc.Log("alpha", map[string]any{"x": 1})
 
-	if err := rc.Close(); err != nil {
+	if err := rc.Close(context.Background()); err != nil {
 		t.Fatalf("Close() error: %v", err)
 	}
 
@@ -179,10 +180,10 @@ func TestRealClient_Close_Idempotent(t *testing.T) {
 	defer srv.Close()
 	rc := newDirect(t, srv.URL, WithTypes("alpha"))
 
-	if err := rc.Close(); err != nil {
+	if err := rc.Close(context.Background()); err != nil {
 		t.Fatalf("first Close() error: %v", err)
 	}
-	if err := rc.Close(); err != nil {
+	if err := rc.Close(context.Background()); err != nil {
 		t.Fatalf("second Close() error: %v", err)
 	}
 }
@@ -194,7 +195,7 @@ func TestRealClient_Close_ForceDrainOn5xx(t *testing.T) {
 	rc := newDirect(t, srv.URL, WithTypes("alpha"), WithBatchSize(100), WithMaxFlushRetries(10), WithFlushInterval(time.Hour))
 
 	_ = rc.Log("alpha", map[string]any{"x": 1})
-	err := rc.Close()
+	err := rc.Close(context.Background())
 
 	if err == nil {
 		t.Fatal("Close() with 5xx server returned nil, want error")

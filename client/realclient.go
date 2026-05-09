@@ -2,6 +2,7 @@ package gobblerclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -35,15 +36,14 @@ type realClient struct {
 // client plus the validation error.
 func New(serverURL string, opts ...Option) (Client, error) {
 	cfg := applyOptions(opts)
-	hc := http.DefaultClient
-	if err := validateServer(serverURL, cfg.types, hc); err != nil {
+	if err := validateServer(serverURL, cfg.types, cfg.httpClient); err != nil {
 		return Nop(), err
 	}
 	rc := &realClient{
 		cfg:        cfg,
 		buf:        make([]bufItem, 0, cfg.batchSize),
 		server:     serverURL,
-		httpClient: hc,
+		httpClient: cfg.httpClient,
 		done:       make(chan struct{}),
 	}
 	rc.start()
@@ -59,7 +59,7 @@ func (r *realClient) start() {
 			select {
 			case <-ticker.C:
 				r.mu.Lock()
-				_ = r.flush()
+				_ = r.flush(context.Background())
 				r.mu.Unlock()
 			case <-r.done:
 				return
@@ -92,7 +92,7 @@ func (r *realClient) Log(typeName string, fields map[string]any) error {
 	r.buf = append(r.buf, bufItem{typeName: typeName, fields: fields})
 
 	if prevLen < r.cfg.batchSize && len(r.buf) >= r.cfg.batchSize {
-		return r.flush()
+		return r.flush(context.Background())
 	}
 	return nil
 }
@@ -106,7 +106,7 @@ func (r *realClient) Log(typeName string, fields map[string]any) error {
 //   - 400              → drain buffer (permanently bad payload), reset counter, return error.
 //   - 200 + rejected   → drain buffer, reset counter, return error with rejection count.
 //   - 200, none rejected → drain buffer, reset counter, return nil.
-func (r *realClient) flush() error {
+func (r *realClient) flush(ctx context.Context) error {
 	if len(r.buf) == 0 {
 		return nil
 	}
@@ -123,7 +123,7 @@ func (r *realClient) flush() error {
 		return fmt.Errorf("gobblerclient: marshal: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, r.server+"/gobbler/ingest", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.server+"/gobbler/ingest", bytes.NewReader(body))
 	if err != nil {
 		// Bad URL — drain so we don't accumulate indefinitely.
 		r.buf = r.buf[:0]
@@ -174,21 +174,21 @@ func (r *realClient) flush() error {
 }
 
 // Flush sends all buffered items to the server immediately.
-func (r *realClient) Flush() error {
+func (r *realClient) Flush(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.flush()
+	return r.flush(ctx)
 }
 
 // Close stops the background goroutine, flushes remaining items, and drains
 // the buffer. Close is idempotent; subsequent calls return nil immediately.
-func (r *realClient) Close() error {
+func (r *realClient) Close(ctx context.Context) error {
 	var err error
 	r.closeOnce.Do(func() {
 		close(r.done)
 		r.mu.Lock()
 		defer r.mu.Unlock()
-		err = r.flush()
+		err = r.flush(ctx)
 		// Always drain on Close — no further retry is possible.
 		r.buf = r.buf[:0]
 	})

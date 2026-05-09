@@ -65,7 +65,7 @@ Low-volume lifecycle events useful for auditing restarts.
 
 ---
 
-## Item definition JSON (register on the logger instance)
+## Item definitions JSON (register on the logger instance)
 
 Post each definition to `POST /gobbler/definition/add` on the logger Gobbler
 instance before starting it. The `folder` values follow Azure container naming
