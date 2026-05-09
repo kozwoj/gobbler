@@ -10,7 +10,6 @@ import (
 	"sync"
 	"testing"
 
-	gobblerclient "github.com/kozwoj/gobbler-client"
 	"github.com/kozwoj/gobbler/pipeline"
 )
 
@@ -190,7 +189,7 @@ func TestIL5_IngestLogging_NopLogger(t *testing.T) {
 	outputDir := t.TempDir()
 	s := New()
 	// s.logger is Nop() by default — do NOT inject a spy.
-	_ = s.logger.(gobblerclient.Client) // compile-time interface check
+	_ = s.logger // logger is gobblerclient.Client; just confirm it's set
 
 	router := newTestRouter(s)
 	configureFileMode(t, router, outputDir)

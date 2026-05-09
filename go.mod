@@ -4,7 +4,7 @@ go 1.24.1
 
 require github.com/kozwoj/gobbler-client v0.0.0
 
-replace github.com/kozwoj/gobbler-client => ./client
+replace github.com/kozwoj/gobbler-client => ../gobbler-client
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.20.0 // indirect
