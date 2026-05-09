@@ -1,71 +1,16 @@
 package server
 
-// Tests for Phase 2 Step 2: gobbler-ingest-event self-logging.
-// These tests inject a spyClient into s.logger and verify the fields
-// emitted by logIngestEvent on the happy path and various 400 paths.
+// Self-logging tests. The spyClient type and startWithAlphaSpy helper are
+// defined in server_helpers_test.go.
 
 import (
-	"context"
 	"net/http"
-	"sync"
 	"testing"
 
 	"github.com/kozwoj/gobbler/pipeline"
 )
 
-// ---- spy client ----
-
-type logCall struct {
-	typeName string
-	fields   map[string]any
-}
-
-type spyClient struct {
-	mu   sync.Mutex
-	logs []logCall
-}
-
-func (s *spyClient) Log(typeName string, fields map[string]any) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.logs = append(s.logs, logCall{typeName: typeName, fields: fields})
-	return nil
-}
-func (s *spyClient) Flush(context.Context) error { return nil }
-func (s *spyClient) Close(context.Context) error { return nil }
-func (s *spyClient) SwapServer(string) error     { return nil }
-
-func (s *spyClient) last() (logCall, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if len(s.logs) == 0 {
-		return logCall{}, false
-	}
-	return s.logs[len(s.logs)-1], true
-}
-
-// startWithAlphaSpy starts the pipeline with the alpha definition, injects a
-// spyClient into s.logger, and returns both the router and the spy.
-func startWithAlphaSpy(t *testing.T) (http.Handler, *Server, *spyClient) {
-	t.Helper()
-	t.Cleanup(pipeline.Reset)
-	outputDir := t.TempDir()
-	s := New()
-	router := newTestRouter(s)
-	configureFileMode(t, router, outputDir)
-	if w := do(t, router, http.MethodPost, "/gobbler/definition/add", alphaDef); w.Code != http.StatusOK {
-		t.Fatalf("add alpha failed: %d %s", w.Code, w.Body.String())
-	}
-	if w := do(t, router, http.MethodPost, "/gobbler/pipeline/start", ""); w.Code != http.StatusOK {
-		t.Fatalf("start failed: %d %s", w.Code, w.Body.String())
-	}
-	spy := &spyClient{}
-	// Direct field injection is valid here because tests are in package server.
-	s.logger = spy
-	return router, s, spy
-}
-
-// ---- tests ----
+// ---- Ingest logging (gobbler-ingest-event) ----
 
 // IL1: Happy path — all items accepted; event fields match.
 func TestIL1_IngestLogging_HappyPath(t *testing.T) {
@@ -189,7 +134,7 @@ func TestIL5_IngestLogging_NopLogger(t *testing.T) {
 	outputDir := t.TempDir()
 	s := New()
 	// s.logger is Nop() by default — do NOT inject a spy.
-	_ = s.logger // logger is gobblerclient.Client; just confirm it's set
+	_ = s.logger
 
 	router := newTestRouter(s)
 	configureFileMode(t, router, outputDir)
@@ -207,4 +152,97 @@ func TestIL5_IngestLogging_NopLogger(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	// No assertion needed — just verifying no panic occurs.
+}
+
+// ---- Pipeline logging (gobbler-pipeline-event) ----
+
+// PL1: handlePipelineStart emits event="start" after the pipeline is up.
+func TestPL1_PipelineLogging_Start(t *testing.T) {
+	t.Cleanup(pipeline.Reset)
+	outputDir := t.TempDir()
+	s := New()
+	router := newTestRouter(s)
+	configureFileMode(t, router, outputDir)
+	if w := do(t, router, http.MethodPost, "/gobbler/definition/add", alphaDef); w.Code != http.StatusOK {
+		t.Fatalf("add alpha failed: %d %s", w.Code, w.Body.String())
+	}
+
+	spy := &spyClient{}
+	s.logger = spy // inject before start so the start handler uses the spy
+
+	if w := do(t, router, http.MethodPost, "/gobbler/pipeline/start", ""); w.Code != http.StatusOK {
+		t.Fatalf("start failed: %d %s", w.Code, w.Body.String())
+	}
+	defer do(t, router, http.MethodPost, "/gobbler/pipeline/stop", "")
+
+	call, ok := spy.last()
+	if !ok {
+		t.Fatal("expected a log call from start, got none")
+	}
+	if call.typeName != "gobbler-pipeline-event" {
+		t.Errorf("typeName = %q, want gobbler-pipeline-event", call.typeName)
+	}
+	if call.fields["event"] != "start" {
+		t.Errorf("event = %v, want start", call.fields["event"])
+	}
+}
+
+// PL2: handlePipelineStop emits event="stop" before the logger is closed.
+func TestPL2_PipelineLogging_Stop(t *testing.T) {
+	router, s, spy := startWithAlphaSpy(t)
+	// stop is called explicitly below; do NOT use defer here.
+
+	if w := do(t, router, http.MethodPost, "/gobbler/pipeline/stop", ""); w.Code != http.StatusOK {
+		t.Fatalf("stop failed: %d %s", w.Code, w.Body.String())
+	}
+
+	// The spy was replaced by Nop on stop, but we still hold the reference.
+	_ = s // ensure s is referenced (the spy was injected into s.logger before stop)
+
+	call, ok := spy.last()
+	if !ok {
+		t.Fatal("expected a log call from stop, got none")
+	}
+	if call.typeName != "gobbler-pipeline-event" {
+		t.Errorf("typeName = %q, want gobbler-pipeline-event", call.typeName)
+	}
+	if call.fields["event"] != "stop" {
+		t.Errorf("event = %v, want stop", call.fields["event"])
+	}
+}
+
+// PL3: handlePipelineRotate emits event="rotate" with the correct itemType.
+func TestPL3_PipelineLogging_Rotate(t *testing.T) {
+	router, _, spy := startWithAlphaSpy(t)
+	defer do(t, router, http.MethodPost, "/gobbler/pipeline/stop", "")
+
+	w := do(t, router, http.MethodPost, "/gobbler/pipeline/rotate", `{"typeName":"alpha"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("rotate failed: %d %s", w.Code, w.Body.String())
+	}
+
+	call, ok := spy.last()
+	if !ok {
+		t.Fatal("expected a log call from rotate, got none")
+	}
+	if call.typeName != "gobbler-pipeline-event" {
+		t.Errorf("typeName = %q, want gobbler-pipeline-event", call.typeName)
+	}
+	if call.fields["event"] != "rotate" {
+		t.Errorf("event = %v, want rotate", call.fields["event"])
+	}
+	if call.fields["itemType"] != "alpha" {
+		t.Errorf("itemType = %v, want alpha", call.fields["itemType"])
+	}
+}
+
+// PL4: Nop logger (default) — no panic on start/stop/rotate.
+func TestPL4_PipelineLogging_NopLogger(t *testing.T) {
+	router := startWithAlpha(t)
+	defer do(t, router, http.MethodPost, "/gobbler/pipeline/stop", "")
+
+	if w := do(t, router, http.MethodPost, "/gobbler/pipeline/rotate", `{"typeName":"alpha"}`); w.Code != http.StatusOK {
+		t.Fatalf("rotate failed: %d %s", w.Code, w.Body.String())
+	}
+	// No assertion needed — verifying no panic.
 }

@@ -199,6 +199,118 @@ func TestError_DefaultValue_BoolMismatch(t *testing.T) {
 	mustFail(t, json, ErrInconsistentDefaultValue)
 }
 
+/* ============================= fixtures shared with conversion_test.go ============================= */
+
+const alphaJSON = `{
+	"name": "alpha",
+	"documentation": "test definition alpha with string, int and datetime types",
+	"folder": "alpha-folder",
+	"latencyMinutes": 1,
+	"orderedColumns": [
+		{"name": "alphaStr",  "type": "string"},
+		{"name": "alphaInt",  "type": "int"},
+		{"name": "alphaDate", "type": "datetime"}
+	]
+}`
+
+const betaJSON = `{
+	"name": "beta",
+	"documentation": "test definition beta with string, bool and real types",
+	"folder": "beta-folder",
+	"latencyMinutes": 2,
+	"orderedColumns": [
+		{"name": "betaStr",  "type": "string"},
+		{"name": "betaBool", "type": "bool"},
+		{"name": "betaReal", "type": "real"}
+	]
+}`
+
+const gammaJSON = `{
+	"name": "gamma",
+	"documentation": "test definition gamma with int, string, and dynamic types",
+	"folder": "gamma-folder",
+	"latencyMinutes": 3,
+	"orderedColumns": [
+		{"name": "gammaInt",     "type": "int"},
+		{"name": "gammaStr",     "type": "string"},
+		{"name": "gammaDynamic", "type": "dynamic"}
+	]
+}`
+
+// buildDefinitionList parses alpha, beta, gamma and returns a populated DefinitionList.
+func buildDefinitionList(t *testing.T) DefinitionList {
+	t.Helper()
+	dl := make(DefinitionList)
+	for _, raw := range []string{alphaJSON, betaJSON, gammaJSON} {
+		var def ItemDefinition
+		if err := CreateItemDefinition(raw, &def); err != nil {
+			t.Fatalf("CreateItemDefinition failed: %v", err)
+		}
+		if err := dl.AddDefinition(def); err != nil {
+			t.Fatalf("AddDefinition failed: %v", err)
+		}
+	}
+	return dl
+}
+
+/* ============================= DefinitionList tests ============================= */
+
+func TestDefinitionList_AddAndGet(t *testing.T) {
+	dl := buildDefinitionList(t)
+
+	def, err := dl.GetDefinition("alpha")
+	if err != nil {
+		t.Fatalf("GetDefinition(alpha): %v", err)
+	}
+	if def.TypeName != "alpha" {
+		t.Errorf("TypeName: got %q, want %q", def.TypeName, "alpha")
+	}
+	if def.Folder != "alpha-folder" {
+		t.Errorf("Folder: got %q, want %q", def.Folder, "alpha-folder")
+	}
+	if def.Latency != 1 {
+		t.Errorf("Latency: got %d, want 1", def.Latency)
+	}
+	if len(def.Columns) != 3 {
+		t.Errorf("Columns: got %d, want 3", len(def.Columns))
+	}
+}
+
+func TestDefinitionList_AllThreeDefinitions(t *testing.T) {
+	dl := buildDefinitionList(t)
+	for _, name := range []string{"alpha", "beta", "gamma"} {
+		if _, err := dl.GetDefinition(name); err != nil {
+			t.Errorf("GetDefinition(%q): %v", name, err)
+		}
+	}
+}
+
+func TestDefinitionList_AddDuplicate(t *testing.T) {
+	dl := buildDefinitionList(t)
+	var def ItemDefinition
+	if err := CreateItemDefinition(alphaJSON, &def); err != nil {
+		t.Fatalf("CreateItemDefinition: %v", err)
+	}
+	err := dl.AddDefinition(def)
+	if err == nil {
+		t.Fatal("expected error adding duplicate, got nil")
+	}
+	if !errors.Is(err, ErrDefinitionAlreadyExists) {
+		t.Errorf("expected ErrDefinitionAlreadyExists, got %v", err)
+	}
+}
+
+func TestDefinitionList_GetNotFound(t *testing.T) {
+	dl := buildDefinitionList(t)
+	_, err := dl.GetDefinition("noSuchType")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, ErrDefinitionNotFound) {
+		t.Errorf("expected ErrDefinitionNotFound, got %v", err)
+	}
+}
+
 func TestError_DefaultValue_IntFractional(t *testing.T) {
 	json := `{"name": "mytype", "orderedColumns": [{"name": "f1", "type": "int", "defaultValue": 3.14}]}`
 	mustFail(t, json, ErrInconsistentDefaultValue)

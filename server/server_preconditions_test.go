@@ -3,53 +3,10 @@ package server
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/kozwoj/gobbler/pipeline"
 )
-
-// newTestRouter wires the same route tree as ListenAndServe but returns the
-// handler without starting a TCP listener. Tests drive it via httptest.
-func newTestRouter(s *Server) http.Handler {
-	r := chi.NewRouter()
-	r.Route("/gobbler", func(r chi.Router) {
-		r.Get("/", s.handleRootDiscovery)
-		r.Route("/definition", s.definitionRoutes)
-		r.Route("/pipeline", s.pipelineRoutes)
-		r.Route("/ingest", s.ingestRoutes)
-	})
-	return r
-}
-
-// do is a small helper that fires a request against the test router and returns
-// the response recorder so callers can inspect status code and body.
-func do(t *testing.T, router http.Handler, method, path, body string) *httptest.ResponseRecorder {
-	t.Helper()
-	var reqBody *strings.Reader
-	if body != "" {
-		reqBody = strings.NewReader(body)
-	} else {
-		reqBody = strings.NewReader("")
-	}
-	req := httptest.NewRequest(method, path, reqBody)
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-	return w
-}
-
-// decodeJSON decodes the response body into a map for assertion.
-func decodeJSON(t *testing.T, w *httptest.ResponseRecorder) map[string]interface{} {
-	t.Helper()
-	var m map[string]interface{}
-	if err := json.NewDecoder(w.Body).Decode(&m); err != nil {
-		t.Fatalf("could not decode response JSON: %v\nbody: %s", err, w.Body.String())
-	}
-	return m
-}
 
 // ---- Category A: Pre-condition enforcement (before configure/start) ----
 
@@ -90,18 +47,6 @@ func TestA3_AddDefinitionBeforeStart(t *testing.T) {
 	s := New()
 	router := newTestRouter(s)
 
-	alphaDef := `{
-		"name": "alpha",
-		"documentation": "test definition alpha with string, int and datetime types",
-		"folder": "alpha-folder",
-		"latencyMinutes": 1,
-		"orderedColumns": [
-			{"name": "alphaStr",  "type": "string"},
-			{"name": "alphaInt",  "type": "int"},
-			{"name": "alphaDate", "type": "datetime"}
-		]
-	}`
-
 	w := do(t, router, http.MethodPost, "/gobbler/definition/add", alphaDef)
 
 	if w.Code != http.StatusOK {
@@ -127,17 +72,6 @@ func TestA4_StartWithDefinitionButNoConfig(t *testing.T) {
 	s := New()
 	router := newTestRouter(s)
 
-	alphaDef := `{
-		"name": "alpha",
-		"documentation": "test definition alpha with string, int and datetime types",
-		"folder": "alpha-folder",
-		"latencyMinutes": 1,
-		"orderedColumns": [
-			{"name": "alphaStr",  "type": "string"},
-			{"name": "alphaInt",  "type": "int"},
-			{"name": "alphaDate", "type": "datetime"}
-		]
-	}`
 	do(t, router, http.MethodPost, "/gobbler/definition/add", alphaDef)
 
 	w := do(t, router, http.MethodPost, "/gobbler/pipeline/start", "")
@@ -183,21 +117,6 @@ func TestA6_DefinitionNamesEmpty(t *testing.T) {
 
 // A7: Definition names returns the registered type names.
 func TestA7_DefinitionNamesAfterAdd(t *testing.T) {
-	alphaDef := `{
-		"name": "alpha",
-		"documentation": "test definition",
-		"folder": "alpha-folder",
-		"latencyMinutes": 1,
-		"orderedColumns": [{"name": "alphaStr", "type": "string"}]
-	}`
-	betaDef := `{
-		"name": "beta",
-		"documentation": "test definition",
-		"folder": "beta-folder",
-		"latencyMinutes": 1,
-		"orderedColumns": [{"name": "betaStr", "type": "string"}]
-	}`
-
 	s := New()
 	router := newTestRouter(s)
 	do(t, router, http.MethodPost, "/gobbler/definition/add", alphaDef)
@@ -221,5 +140,95 @@ func TestA7_DefinitionNamesAfterAdd(t *testing.T) {
 	}
 	if !nameSet["alpha"] || !nameSet["beta"] {
 		t.Errorf("expected alpha and beta in names, got %v", names)
+	}
+}
+
+// ---- Category B: Configure validation ----
+
+// B1: Configure with missing mode returns 400.
+func TestB1_ConfigureMissingMode(t *testing.T) {
+	s := New()
+	router := newTestRouter(s)
+
+	w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure",
+		`{"outputDir": "/tmp/gobbler", "writerQueueSize": 10, "writerBatchSize": 5}`)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// B2: Configure with mode=file but no outputDir returns 400.
+func TestB2_ConfigureFileModeNoOutputDir(t *testing.T) {
+	s := New()
+	router := newTestRouter(s)
+
+	w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure",
+		`{"mode": "file", "writerQueueSize": 10, "writerBatchSize": 5}`)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// B3: Configure with mode=blob but missing accountKey returns 400.
+func TestB3_ConfigureBlobModeNoAccountKey(t *testing.T) {
+	s := New()
+	router := newTestRouter(s)
+
+	w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure",
+		`{"mode": "blob", "accountName": "myaccount", "writerQueueSize": 10, "writerBatchSize": 5}`)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// B4: Configure with valid file mode returns 200.
+func TestB4_ConfigureFileModeValid(t *testing.T) {
+	s := New()
+	router := newTestRouter(s)
+
+	w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure",
+		`{"mode": "file", "outputDir": "/tmp/gobbler", "writerQueueSize": 10, "writerBatchSize": 5}`)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	body := decodeJSON(t, w)
+	if body["status"] != "ok" {
+		t.Errorf("expected status=ok, got %v", body["status"])
+	}
+}
+
+// B5: Status after valid configure reflects the stored configuration.
+func TestB5_StatusAfterConfigure(t *testing.T) {
+	s := New()
+	router := newTestRouter(s)
+
+	do(t, router, http.MethodPost, "/gobbler/pipeline/configure",
+		`{"mode": "file", "outputDir": "/tmp/gobbler", "writerQueueSize": 10, "writerBatchSize": 5}`)
+
+	w := do(t, router, http.MethodGet, "/gobbler/pipeline/status", "")
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	body := decodeJSON(t, w)
+
+	if body["configured"] != true {
+		t.Errorf("expected configured=true, got %v", body["configured"])
+	}
+	if body["running"] != false {
+		t.Errorf("expected running=false, got %v", body["running"])
+	}
+	if body["mode"] != "file" {
+		t.Errorf("expected mode=file, got %v", body["mode"])
+	}
+	if body["writerQueueSize"] != float64(10) {
+		t.Errorf("expected writerQueueSize=10, got %v", body["writerQueueSize"])
+	}
+	if body["writerBatchSize"] != float64(5) {
+		t.Errorf("expected writerBatchSize=5, got %v", body["writerBatchSize"])
 	}
 }
