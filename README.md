@@ -3,7 +3,7 @@
 GOBBLER is a log ingestion REST service which offers the following functionality
 - it accepts JSON descriptions of the structure of ingested items (their types)
 - it accepts arrays of JSON objects representing the defined items, and validates them for consistency
-- it converts the JSON representation of well-formed items to CSV strings (assuming fixes sequence of items fields in a type)
+- it converts the JSON representation of well-formed items to CSV strings (assuming sequence fields in the definition)
 - it then stores CSV stings representing items of the same type in 
     - time-and-type-stamped sequence of local files, or
     - time-and-type-stamped sequence of AZURE blobs.
