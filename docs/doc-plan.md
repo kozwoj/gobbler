@@ -11,7 +11,7 @@ This file tracks the documentation cleanup and completion work. Annotate section
 | `README.md` | Primary entry point for operators and contributors | Needs work — see below |
 | `docs/REST-commands.md` | Authoritative REST API reference | **Complete** — all endpoints documented |
 | `docs/pipeline_architecture.md` | Internal architecture reference for contributors | Keep as-is |
-| `docs/gobbler-logging.md` | Describes item types emitted by Gobbler's self-logging | Keep — pending decision on where this info lives long-term |
+| `docs/JSON-schemas.md` | All JSON object definitions: configuration, item type, and self-logging item types | **Complete** |
 | `docs/config_schema.json` | JSON schema for pipeline/configure body | Keep — referenced by REST-commands.md |
 | `docs/item_schema.json` | JSON schema for definition/add body | Keep — referenced by REST-commands.md |
 | `gobbler-client/README.md` | SDK entry point for application developers | **Missing — needs to be created** |
@@ -42,7 +42,7 @@ The current README has a good overview and architecture narrative, but it:
 ## Configuration
   pipeline/configure fields explained in prose (not just JSON)
   file mode vs blob mode
-  self-logging setup (reference gobbler-logging.md for type definitions)
+  self-logging setup (reference JSON-schemas.md for type definitions)
 
 ## Architecture
   keep current content; update "docs/" reference to specific links
@@ -98,23 +98,9 @@ Audience: application developers who want to integrate Gobbler logging into thei
 
 ---
 
-### 3. `docs/gobbler-logging.md` — decide destination
+### 3. `docs/gobbler-logging.md` — ~~decide destination~~
 
-Currently describes the four self-logging item types:
-- `gobbler-ingest-event`
-- `gobbler-writer-flush`
-- `gobbler-writer-error`
-- `gobbler-pipeline-event`
-
-And their fields, and the relationship to `scripts/setup-logger.ps1`.
-
-**Options (pick one):**
-
-- [ ] Keep as a standalone reference doc — link from README "Configuration > self-logging" and from `REST-commands.md` pipeline/configure section (already linked there)
-- [ ] Merge the type definitions into `REST-commands.md` as an appendix
-- [ ] Move into the main `README.md` under "Configuration"
-
-<!-- DECISION: -->
+Merged into `docs/JSON-schemas.md` (section 3). File deleted.
 
 ---
 
@@ -132,7 +118,7 @@ Contributor reference; keep as-is.
 
 ## Order of execution
 
-1. Decide destination for `gobbler-logging.md` content (item 3 above)
+1. ~~Decide destination for `gobbler-logging.md` content (item 3 above)~~ — done
 2. Write `gobbler-client/README.md` (item 2)
 3. Rewrite `README.md` (item 1) — do last so it can link to the finished gobbler-client README
 

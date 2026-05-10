@@ -5,29 +5,24 @@ import (
 	"encoding/json"
 )
 
-//go:embed docs/testDefinitions.json
-var testDefinitionsRaw []byte
-
-//go:embed docs/itemDefinitionExamples.json
-var itemDefinitionExamplesRaw []byte
+//go:embed docs/testItemDefinitions.json
+var testItemDefinitionsRaw []byte
 
 // definitionIndex maps type name → raw JSON of the full definition object.
 var definitionIndex map[string]json.RawMessage
 
 func init() {
 	definitionIndex = make(map[string]json.RawMessage)
-	for _, raw := range [][]byte{testDefinitionsRaw, itemDefinitionExamplesRaw} {
-		var defs []json.RawMessage
-		if err := json.Unmarshal(raw, &defs); err != nil {
-			panic("tester: failed to parse embedded definition JSON: " + err.Error())
+	var defs []json.RawMessage
+	if err := json.Unmarshal(testItemDefinitionsRaw, &defs); err != nil {
+		panic("tester: failed to parse embedded definition JSON: " + err.Error())
+	}
+	for _, d := range defs {
+		var header struct {
+			Name string `json:"name"`
 		}
-		for _, d := range defs {
-			var header struct {
-				Name string `json:"name"`
-			}
-			if err := json.Unmarshal(d, &header); err == nil && header.Name != "" {
-				definitionIndex[header.Name] = d
-			}
+		if err := json.Unmarshal(d, &header); err == nil && header.Name != "" {
+			definitionIndex[header.Name] = d
 		}
 	}
 }

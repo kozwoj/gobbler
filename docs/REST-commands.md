@@ -146,7 +146,7 @@ Field rules:
 - `writerQueueSize` — capacity of each per-type writer's internal channel.
 - `writerBatchSize` — number of CSV rows accumulated before the writer flushes to storage.
 - `loggerEndpoint` — optional; URL of a separate Gobbler server that will receive this server's own operational events. When omitted, self-logging is disabled.
-- `loggerTypes` — optional array of item type name strings the self-logging client will emit. Only meaningful when `loggerEndpoint` is set. Standard types (defined in [`docs/gobbler-logging.md`](gobbler-logging.md)): `"gobbler-ingest-event"`, `"gobbler-writer-flush"`, `"gobbler-writer-error"`, `"gobbler-pipeline-event"`. These types must already be registered on the target logger Gobbler instance.
+- `loggerTypes` — optional array of item type name strings the self-logging client will emit. Only meaningful when `loggerEndpoint` is set. Standard types (defined in [`docs/JSON-schemas.md`](JSON-schemas.md#3-self-logging-item-definitions)): `"gobbler-ingest-event"`, `"gobbler-writer-flush"`, `"gobbler-writer-error"`, `"gobbler-pipeline-event"`. These types must already be registered on the target logger Gobbler instance.
 - `loggerBatchSize` — optional; batch size for the self-logging client. Defaults to `100` when omitted or `0`.
 - `loggerFlushInterval` — optional; Go duration string (e.g. `"30s"`) for the self-logging client flush interval. Defaults to `10s` when omitted.
 
