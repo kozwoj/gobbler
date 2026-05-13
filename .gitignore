@@ -29,3 +29,4 @@ Thumbs.db
 
 # Secrets
 tester/secrets.json
+scripts\setup-logger-remotely.md

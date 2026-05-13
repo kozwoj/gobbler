@@ -20,7 +20,7 @@ The Gobbler processes incoming JSON items through a sequence of well‑defined s
   - If the queue is full the item is rejected immediately and reported back to the caller — no silent drops.
   - The worker goroutine calls the writer's `Add` method for each dequeued `CSVitem`.
     - The writer accumulates CSV strings in a batch buffer; when the buffer reaches `writerBatchSize` it is flushed to a file or blob.
-  - When a file/blob reaches its configured size the writer rotates it (closes the current file/blob and opens a new one).
+  - When a file/blob's age exceeds `latencyMinutes` (tracked via the file/blob open timestamp), the writer rotates it (closes the current file/blob and opens a new one).
   - This is the end of the ingestion pipeline.
 
 All workers are functionally identical. The only difference between them is where they store the CSV‑encoded items. A worker stores items either in:
@@ -110,8 +110,8 @@ Each worker:
 - Flushes the batch to a file/blob when:
   - batch size threshold is reached, or
   - a flush timeout occurs.
-- Tracks file/blob size.
-- Rotates when the size limit is reached.
+- Tracks file/blob open timestamp.
+- Rotates when the age limit (`latencyMinutes`) is reached.
 
 ### Note
 
@@ -176,7 +176,7 @@ default:
 }
 ```
 
-Adding a new type atomically swaps in a new routing table so the ingest handler never observes a partial update:
+Adding, removing, or resetting types each atomically swaps in a new routing table so the ingest handler never observes a partial update:
 
 ``` go
 func AddItemType(t ItemType, desc *TypeDescriptor) {
@@ -187,6 +187,23 @@ func AddItemType(t ItemType, desc *TypeDescriptor) {
     }
     newTable[t] = desc
     routing.Store(&newTable)
+}
+
+func RemoveItemType(t ItemType) {
+    old := routing.Load()
+    newTable := make(RoutingTable, len(*old))
+    for k, v := range *old {
+        if k != t {
+            newTable[k] = v
+        }
+    }
+    routing.Store(&newTable)
+}
+
+// Reset clears all state; call only after wg.Wait() confirms all workers have exited.
+func Reset() {
+    empty := make(RoutingTable)
+    routing.Store(&empty)
 }
 ```
 
