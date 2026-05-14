@@ -142,7 +142,7 @@ More detailed description of the REST interfaces is provides in `docs\REST-comma
 
 ## Gobbler Logging
 
-Gobbler can log its own operational events to a second Gobbler instance (the "logger Gobbler"), enabling structured, queryable telemetry about ingestion performance and writer behaviour. This self-logging feature is configured via the `POST /gobbler/pipeline/configure` endpoint using the following fields:
+Gobbler can log its own operational events, using Gobbler Client SDK, to a second Gobbler instance (the "logger Gobbler"), enabling structured, queryable telemetry about ingestion performance and writer behaviour. This self-logging feature is configured via the `POST /gobbler/pipeline/configure` endpoint using the following fields:
 
 | Field | Type | Description |
 |---|---|---|
@@ -151,7 +151,7 @@ Gobbler can log its own operational events to a second Gobbler instance (the "lo
 | `loggerBatchSize` | int | Client batch size; 0 uses the default (100) |
 | `loggerFlushInterval` | string | Go duration string, e.g. `"30s"`; `""` uses the default (10s) |
 
-When `loggerEndpoint` is set, the server constructs an internal Gobbler client that ships operational events to the logger instance. Four event types are defined:
+When `loggerEndpoint` is set, the server constructs an internal [`gobbler-client`](https://github.com/kozwoj/gobbler-client) that ships operational events to the logger instance. The client buffers items in memory and flushes them in batches; if the logger is unreachable it returns `ErrBufferFullServerDown` so the instrumented instance continues operating without blocking. Four event types are defined:
 
 | Type name | Folder | Description |
 |---|---|---|
