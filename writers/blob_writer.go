@@ -156,7 +156,7 @@ func (w *BlobWriter) flush() {
 	ctx := context.Background()
 	rotate := w.blobClient == nil || time.Since(w.blobStart) >= w.maxAge
 	if rotate {
-		w.blobStart = time.Now()
+		w.blobStart = firstItemTime(w.buffer)
 		blobName := fmt.Sprintf("%s_%s", w.blobStart.Format("2006-01-02_15-04-05.000"), w.typeName)
 		blobURL := fmt.Sprintf("https://%s.blob.core.windows.net/%s/%s",
 			w.accountName, w.container, blobName)

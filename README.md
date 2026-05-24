@@ -30,7 +30,9 @@ Gobbler accepts arrays of JSON objects representing defined items types and
 - appends the buffers to timestamped files/blobs named after item type names, and 
 - rotates the files/blobs on the time interval set in item (`latencyMinutes` property above).
 
-Files/blobs with items of the same type are stored in one directory/container, named after item type name or by the `folder` definition property. This makes it convenient for processing them with analytical DB systems like Kusto (aka Azure Analytics) or DockDB.
+Files/blobs with items of the same type are stored in one directory/container, named after item type name or by the `folder` definition property. File/blob names have the following structure `YYYY-MM-DD_HH-MM-SS.mmm_<typeName>.csv`, where the file timestamp preceding the type name is equal to the timestamp of the first item stored in this file/blob. 
+
+This convention makes it convenient for processing the CSV files with analytical DB systems like Kusto (aka Azure Analytics) or DockDB.
 
 ## Gobbler Architecture
 

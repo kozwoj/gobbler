@@ -17,6 +17,18 @@ import (
 const tickInterval = 500 * time.Millisecond
 const defaultMaxAge = 60 * time.Minute
 
+// firstItemTime extracts the ingest timestamp from the first line of a non-empty
+// CSV buffer. The timestamp is always the first comma-separated field, formatted
+// as "2006-01-02 15:04:05.000". Returns time.Now() if parsing fails.
+func firstItemTime(buffer []string) time.Time {
+	first := strings.SplitN(buffer[0], ",", 2)[0]
+	t, err := time.Parse("2006-01-02 15:04:05.000", first)
+	if err != nil {
+		return time.Now()
+	}
+	return t
+}
+
 // FileWriter accumulates CSVitems in a buffer and flushes them to timestamped CSV
 // files under a local directory. Files rotate when their age exceeds the item's Latency.
 type FileWriter struct {
@@ -126,7 +138,7 @@ func (w *FileWriter) Rotate() {
 		// Write buffered lines to the current file before closing it.
 		if w.file == nil {
 			// No file open yet; open one now so buffered data is not lost.
-			fname := fmt.Sprintf("%s_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"), w.typeName)
+			fname := fmt.Sprintf("%s_%s.csv", firstItemTime(w.buffer).Format("2006-01-02_15-04-05.000"), w.typeName)
 			f, err := os.OpenFile(filepath.Join(w.outputDir, fname), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 			if err != nil {
 				_ = w.logger.Log("gobbler-writer-error", map[string]any{"itemType": w.typeName, "operation": "rotate-open-file", "errorMsg": err.Error()})
@@ -143,7 +155,7 @@ func (w *FileWriter) Rotate() {
 		output := w.file.Name()
 		itemsCount := len(w.buffer)
 		w.buffer = nil
-			_ = w.logger.Log("gobbler-writer-flush", map[string]any{"itemType": w.typeName, "itemsFlushed": itemsCount, "output": output})
+		_ = w.logger.Log("gobbler-writer-flush", map[string]any{"itemType": w.typeName, "itemsFlushed": itemsCount, "output": output})
 	}
 	if w.file != nil {
 		w.file.Close()
@@ -164,14 +176,14 @@ func (w *FileWriter) flush() {
 			w.file.Close()
 			w.file = nil
 		}
-		fname := fmt.Sprintf("%s_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"), w.typeName)
+		w.fileStart = firstItemTime(w.buffer)
+		fname := fmt.Sprintf("%s_%s.csv", w.fileStart.Format("2006-01-02_15-04-05.000"), w.typeName)
 		f, err := os.OpenFile(filepath.Join(w.outputDir, fname), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			_ = w.logger.Log("gobbler-writer-error", map[string]any{"itemType": w.typeName, "operation": "open-file", "errorMsg": err.Error()})
 			return
 		}
 		w.file = f
-		w.fileStart = time.Now()
 	}
 	if _, err := w.file.WriteString(strings.Join(w.buffer, "\n") + "\n"); err != nil {
 		_ = w.logger.Log("gobbler-writer-error", map[string]any{"itemType": w.typeName, "operation": "write-file", "errorMsg": err.Error()})
