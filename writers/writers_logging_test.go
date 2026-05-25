@@ -6,11 +6,16 @@ package writers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	gobblerclient "github.com/kozwoj/gobbler-client"
 	"github.com/kozwoj/gobbler/items"
 	"github.com/kozwoj/gobbler/pipeline"
@@ -36,7 +41,7 @@ func (s *writerSpy) Log(typeName string, fields map[string]any) error {
 }
 func (s *writerSpy) Flush(context.Context) error { return nil }
 func (s *writerSpy) Close(context.Context) error { return nil }
-func (s *writerSpy) SwapServer(string) error { return nil }
+func (s *writerSpy) SwapServer(string) error     { return nil }
 
 func (s *writerSpy) first(typeName string) (writerLogCall, bool) {
 	s.mu.Lock()
@@ -244,5 +249,143 @@ func TestWL6_FileWriter_TickerFlushEvent(t *testing.T) {
 
 	if _, ok := spy.first("gobbler-writer-flush"); !ok {
 		t.Fatal("expected gobbler-writer-flush from ticker goroutine, got none")
+	}
+}
+
+// ---- type.json tests ----
+
+type typeJSONColumn struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type typeJSONFile struct {
+	Name           string           `json:"name"`
+	OrderedColumns []typeJSONColumn `json:"orderedColumns"`
+}
+
+// WL7: NewFileWriter writes type.json with timestamp prepended and correct columns.
+func TestWL7_NewFileWriter_TypeJSON(t *testing.T) {
+	outputDir := t.TempDir()
+	def := alphaDefForWriters(t) // name=alpha, folder=alpha, columns: alphaStr(string), alphaInt(int)
+	_, err := NewFileWriter(outputDir, def, 10)
+	if err != nil {
+		t.Fatalf("NewFileWriter: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(outputDir, "alpha", "type.json"))
+	if err != nil {
+		t.Fatalf("type.json not found: %v", err)
+	}
+
+	var got typeJSONFile
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unmarshal type.json: %v", err)
+	}
+
+	if got.Name != "alpha" {
+		t.Errorf("name: got %q, want %q", got.Name, "alpha")
+	}
+	want := []typeJSONColumn{
+		{Name: "timestamp", Type: "datetime"},
+		{Name: "alphaStr", Type: "string"},
+		{Name: "alphaInt", Type: "int"},
+	}
+	if len(got.OrderedColumns) != len(want) {
+		t.Fatalf("column count: got %d, want %d", len(got.OrderedColumns), len(want))
+	}
+	for i, w := range want {
+		g := got.OrderedColumns[i]
+		if g != w {
+			t.Errorf("column[%d]: got {%q %q}, want {%q %q}", i, g.Name, g.Type, w.Name, w.Type)
+		}
+	}
+}
+
+// ---- BlobWriter type.json integration test ----
+
+type writerBlobSecrets struct {
+	AccountName string `json:"accountName"`
+	AccountKey  string `json:"accountKey"`
+}
+
+func loadBlobSecretsForWriters(t *testing.T) writerBlobSecrets {
+	t.Helper()
+	data, err := os.ReadFile("../tester/secrets.json")
+	if err != nil {
+		t.Skip("../tester/secrets.json not found — skipping blob integration test")
+	}
+	var s writerBlobSecrets
+	if err := json.Unmarshal(data, &s); err != nil {
+		t.Fatalf("could not parse tester/secrets.json: %v", err)
+	}
+	return s
+}
+
+// WL8: NewBlobWriter uploads type.json to the container with timestamp prepended and correct columns.
+func TestWL8_NewBlobWriter_TypeJSON(t *testing.T) {
+	sec := loadBlobSecretsForWriters(t)
+
+	container := fmt.Sprintf("g-wl8-%x", time.Now().UnixNano())
+
+	var def items.ItemDefinition
+	defJSON := fmt.Sprintf(
+		`{"name":"wl8type","folder":%q,"latencyMinutes":1,`+
+			`"orderedColumns":[{"name":"vmId","type":"string"},{"name":"count","type":"int"}]}`,
+		container)
+	if err := items.CreateItemDefinition(defJSON, &def); err != nil {
+		t.Fatalf("CreateItemDefinition: %v", err)
+	}
+
+	_, err := NewBlobWriter(pipeline.BlobConfig{AccountName: sec.AccountName, AccountKey: sec.AccountKey}, def, 10)
+	if err != nil {
+		t.Fatalf("NewBlobWriter: %v", err)
+	}
+
+	cred, err := azblob.NewSharedKeyCredential(sec.AccountName, sec.AccountKey)
+	if err != nil {
+		t.Fatalf("credential: %v", err)
+	}
+	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", sec.AccountName)
+	client, err := azblob.NewClientWithSharedKeyCredential(serviceURL, cred, nil)
+	if err != nil {
+		t.Fatalf("service client: %v", err)
+	}
+
+	t.Cleanup(func() {
+		client.DeleteContainer(context.Background(), container, nil) //nolint
+	})
+
+	resp, err := client.DownloadStream(context.Background(), container, "type.json", nil)
+	if err != nil {
+		t.Fatalf("download type.json: %v", err)
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read type.json body: %v", err)
+	}
+
+	var got typeJSONFile
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unmarshal type.json: %v", err)
+	}
+
+	if got.Name != "wl8type" {
+		t.Errorf("name: got %q, want %q", got.Name, "wl8type")
+	}
+	wantCols := []typeJSONColumn{
+		{Name: "timestamp", Type: "datetime"},
+		{Name: "vmId", Type: "string"},
+		{Name: "count", Type: "int"},
+	}
+	if len(got.OrderedColumns) != len(wantCols) {
+		t.Fatalf("column count: got %d, want %d", len(got.OrderedColumns), len(wantCols))
+	}
+	for i, w := range wantCols {
+		g := got.OrderedColumns[i]
+		if g != w {
+			t.Errorf("column[%d]: got {%q %q}, want {%q %q}", i, g.Name, g.Type, w.Name, w.Type)
+		}
 	}
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/appendblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 
 	gobblerclient "github.com/kozwoj/gobbler-client"
 	"github.com/kozwoj/gobbler/items"
@@ -44,7 +45,8 @@ type BlobWriter struct {
 }
 
 // NewBlobWriter creates a BlobWriter for the given definition and blob credentials.
-// It creates the Azure container if it does not already exist.
+// It creates the Azure container if it does not already exist and uploads a type.json
+// blob describing the stored item structure.
 // writerBatchSize controls how many CSV lines trigger an immediate flush.
 func NewBlobWriter(cfg pipeline.BlobConfig, def items.ItemDefinition, writerBatchSize int) (*BlobWriter, error) {
 	cred, err := azblob.NewSharedKeyCredential(cfg.AccountName, cfg.AccountKey)
@@ -62,6 +64,19 @@ func NewBlobWriter(cfg pipeline.BlobConfig, def items.ItemDefinition, writerBatc
 	_, err = containerClient.Create(context.Background(), nil)
 	if err != nil && !strings.Contains(err.Error(), "ContainerAlreadyExists") {
 		return nil, fmt.Errorf("writers: create container %s: %w", def.Folder, err)
+	}
+
+	schema, err := items.StoredItemDefinition(def)
+	if err != nil {
+		return nil, fmt.Errorf("writers: build type.json for %s: %w", def.TypeName, err)
+	}
+	typeJSONURL := fmt.Sprintf("https://%s.blob.core.windows.net/%s/type.json", cfg.AccountName, def.Folder)
+	bbClient, err := blockblob.NewClientWithSharedKeyCredential(typeJSONURL, cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("writers: create type.json blob client for %s: %w", def.TypeName, err)
+	}
+	if _, err = bbClient.UploadBuffer(context.Background(), schema, nil); err != nil {
+		return nil, fmt.Errorf("writers: upload type.json for %s: %w", def.TypeName, err)
 	}
 
 	maxAge := time.Duration(def.Latency) * time.Minute

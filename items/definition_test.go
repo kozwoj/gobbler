@@ -1,6 +1,7 @@
 package items
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 )
@@ -329,4 +330,67 @@ func TestError_DefaultValue_DynamicInvalidJSON(t *testing.T) {
 func TestError_DefaultValue_TimespanInvalid(t *testing.T) {
 	json := `{"name": "mytype", "orderedColumns": [{"name": "f1", "type": "timespan", "defaultValue": "2days"}]}`
 	mustFail(t, json, ErrInconsistentDefaultValue)
+}
+
+/* ============================= StoredItemDefinition ============================= */
+
+func TestStoredItemDefinition_TimestampPrepended(t *testing.T) {
+	def := mustCreate(t, `{"name": "evt", "folder": "evt-folder", "orderedColumns": [
+		{"name": "vmId", "type": "string"},
+		{"name": "duration", "type": "timespan"}
+	]}`)
+	data, err := StoredItemDefinition(def)
+	if err != nil {
+		t.Fatalf("StoredItemDefinition: %v", err)
+	}
+	// Unmarshal and inspect
+	var got storedItemDef
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Name != "evt" {
+		t.Errorf("name: got %q, want %q", got.Name, "evt")
+	}
+	if len(got.OrderedColumns) != 3 {
+		t.Fatalf("column count: got %d, want 3", len(got.OrderedColumns))
+	}
+	first := got.OrderedColumns[0]
+	if first.Name != "timestamp" || first.Type != "datetime" {
+		t.Errorf("first column: got {%q %q}, want {timestamp datetime}", first.Name, first.Type)
+	}
+}
+
+func TestStoredItemDefinition_ColumnOrder(t *testing.T) {
+	def := mustCreate(t, `{"name": "multi", "folder": "multi-folder", "orderedColumns": [
+		{"name": "a", "type": "int"},
+		{"name": "b", "type": "bool"},
+		{"name": "c", "type": "dynamic"},
+		{"name": "d", "type": "real"},
+		{"name": "e", "type": "datetime"}
+	]}`)
+	data, err := StoredItemDefinition(def)
+	if err != nil {
+		t.Fatalf("StoredItemDefinition: %v", err)
+	}
+	var got storedItemDef
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	want := []storedColumn{
+		{Name: "timestamp", Type: "datetime"},
+		{Name: "a", Type: "int"},
+		{Name: "b", Type: "bool"},
+		{Name: "c", Type: "dynamic"},
+		{Name: "d", Type: "real"},
+		{Name: "e", Type: "datetime"},
+	}
+	if len(got.OrderedColumns) != len(want) {
+		t.Fatalf("column count: got %d, want %d", len(got.OrderedColumns), len(want))
+	}
+	for i, w := range want {
+		g := got.OrderedColumns[i]
+		if g != w {
+			t.Errorf("column[%d]: got {%q %q}, want {%q %q}", i, g.Name, g.Type, w.Name, w.Type)
+		}
+	}
 }

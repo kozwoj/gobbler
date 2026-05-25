@@ -361,3 +361,29 @@ func CheckFileName(fileName string) error {
 	}
 	return nil // valid name
 }
+
+// storedColumn is the simplified column descriptor written to type.json.
+type storedColumn struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+// storedItemDef is the simplified item definition written to type.json alongside
+// the CSV data files/blobs so that query tools know the record structure.
+type storedItemDef struct {
+	Name           string         `json:"name"`
+	OrderedColumns []storedColumn `json:"orderedColumns"`
+}
+
+// StoredItemDefinition returns the JSON bytes of the simplified item definition
+// written as type.json in every directory/container that holds CSV data for def.
+// A "timestamp" (datetime) column is always prepended as the first column,
+// reflecting the ingest timestamp Gobbler adds to every CSV record.
+func StoredItemDefinition(def ItemDefinition) ([]byte, error) {
+	cols := make([]storedColumn, 0, len(def.Columns)+1)
+	cols = append(cols, storedColumn{Name: "timestamp", Type: "datetime"})
+	for _, c := range def.Columns {
+		cols = append(cols, storedColumn{Name: c.Name, Type: ColumnTypesMap[c.ValueType]})
+	}
+	return json.MarshalIndent(storedItemDef{Name: def.TypeName, OrderedColumns: cols}, "", "  ")
+}
