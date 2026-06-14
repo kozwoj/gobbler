@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -555,10 +556,16 @@ func TestG6_StopReconfigureRestart(t *testing.T) {
 	if err != nil || len(entries2) == 0 {
 		t.Errorf("expected CSV files in dir2/alpha-folder, got err=%v count=%d", err, len(entries2))
 	}
-	// dir1/alpha-folder must be empty (no ingest happened in cycle 1).
+	// dir1/alpha-folder must have no CSV data files (no ingest happened in cycle 1).
 	entries1, _ := os.ReadDir(filepath.Join(dir1, "alpha-folder"))
-	if len(entries1) > 0 {
-		t.Errorf("expected no CSV files in dir1/alpha-folder after reconfigure, got %d", len(entries1))
+	csvCount := 0
+	for _, e := range entries1 {
+		if strings.HasSuffix(e.Name(), ".csv") {
+			csvCount++
+		}
+	}
+	if csvCount > 0 {
+		t.Errorf("expected no CSV files in dir1/alpha-folder after reconfigure, got %d", csvCount)
 	}
 }
 

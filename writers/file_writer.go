@@ -48,7 +48,7 @@ type FileWriter struct {
 // NewFileWriter creates a FileWriter for the given definition rooted at rootDir.
 // writerBatchSize controls how many CSV lines trigger an immediate flush.
 // The subdirectory rootDir/def.Folder is created if it does not exist.
-// A type.json file describing the stored item structure is written to that directory.
+// A {typeName}.json file describing the stored item structure is written to that directory.
 func NewFileWriter(rootDir string, def items.ItemDefinition, writerBatchSize int) (*FileWriter, error) {
 	outputDir := filepath.Join(rootDir, def.Folder)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
@@ -56,10 +56,10 @@ func NewFileWriter(rootDir string, def items.ItemDefinition, writerBatchSize int
 	}
 	schema, err := items.StoredItemDefinition(def)
 	if err != nil {
-		return nil, fmt.Errorf("writers: build type.json for %s: %w", def.TypeName, err)
+		return nil, fmt.Errorf("writers: build %s.json for %s: %w", def.TypeName, def.TypeName, err)
 	}
-	if err := os.WriteFile(filepath.Join(outputDir, "type.json"), schema, 0644); err != nil {
-		return nil, fmt.Errorf("writers: write type.json for %s: %w", def.TypeName, err)
+	if err := os.WriteFile(filepath.Join(outputDir, def.TypeName+".json"), schema, 0644); err != nil {
+		return nil, fmt.Errorf("writers: write %s.json for %s: %w", def.TypeName, def.TypeName, err)
 	}
 	maxAge := time.Duration(def.Latency) * time.Minute
 	if maxAge == 0 {

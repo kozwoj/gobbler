@@ -252,7 +252,7 @@ func TestWL6_FileWriter_TickerFlushEvent(t *testing.T) {
 	}
 }
 
-// ---- type.json tests ----
+// ---- {typeName}.json tests ----
 
 type typeJSONColumn struct {
 	Name string `json:"name"`
@@ -264,7 +264,7 @@ type typeJSONFile struct {
 	OrderedColumns []typeJSONColumn `json:"orderedColumns"`
 }
 
-// WL7: NewFileWriter writes type.json with timestamp prepended and correct columns.
+// WL7: NewFileWriter writes {typeName}.json with timestamp prepended and correct columns.
 func TestWL7_NewFileWriter_TypeJSON(t *testing.T) {
 	outputDir := t.TempDir()
 	def := alphaDefForWriters(t) // name=alpha, folder=alpha, columns: alphaStr(string), alphaInt(int)
@@ -273,14 +273,14 @@ func TestWL7_NewFileWriter_TypeJSON(t *testing.T) {
 		t.Fatalf("NewFileWriter: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(outputDir, "alpha", "type.json"))
+	data, err := os.ReadFile(filepath.Join(outputDir, "alpha", "alpha.json"))
 	if err != nil {
-		t.Fatalf("type.json not found: %v", err)
+		t.Fatalf("alpha.json not found: %v", err)
 	}
 
 	var got typeJSONFile
 	if err := json.Unmarshal(data, &got); err != nil {
-		t.Fatalf("unmarshal type.json: %v", err)
+		t.Fatalf("unmarshal alpha.json: %v", err)
 	}
 
 	if got.Name != "alpha" {
@@ -302,7 +302,7 @@ func TestWL7_NewFileWriter_TypeJSON(t *testing.T) {
 	}
 }
 
-// ---- BlobWriter type.json integration test ----
+// ---- BlobWriter {typeName}.json integration test ----
 
 type writerBlobSecrets struct {
 	AccountName string `json:"accountName"`
@@ -322,7 +322,7 @@ func loadBlobSecretsForWriters(t *testing.T) writerBlobSecrets {
 	return s
 }
 
-// WL8: NewBlobWriter uploads type.json to the container with timestamp prepended and correct columns.
+// WL8: NewBlobWriter uploads {typeName}.json to the container with timestamp prepended and correct columns.
 func TestWL8_NewBlobWriter_TypeJSON(t *testing.T) {
 	sec := loadBlobSecretsForWriters(t)
 
@@ -356,19 +356,19 @@ func TestWL8_NewBlobWriter_TypeJSON(t *testing.T) {
 		client.DeleteContainer(context.Background(), container, nil) //nolint
 	})
 
-	resp, err := client.DownloadStream(context.Background(), container, "type.json", nil)
+	resp, err := client.DownloadStream(context.Background(), container, "wl8type.json", nil)
 	if err != nil {
-		t.Fatalf("download type.json: %v", err)
+		t.Fatalf("download wl8type.json: %v", err)
 	}
 	defer resp.Body.Close()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatalf("read type.json body: %v", err)
+		t.Fatalf("read wl8type.json body: %v", err)
 	}
 
 	var got typeJSONFile
 	if err := json.Unmarshal(data, &got); err != nil {
-		t.Fatalf("unmarshal type.json: %v", err)
+		t.Fatalf("unmarshal wl8type.json: %v", err)
 	}
 
 	if got.Name != "wl8type" {

@@ -142,7 +142,12 @@ func countBlobsInContainer(t *testing.T, sec blobSecrets, container string) int 
 			t.Errorf("countBlobsInContainer: list: %v", err)
 			return count
 		}
-		count += len(page.Segment.BlobItems)
+		for _, blob := range page.Segment.BlobItems {
+			// Skip schema files ({typeName}.json); count only data blobs.
+			if !strings.HasSuffix(*blob.Name, ".json") {
+				count++
+			}
+		}
 	}
 	return count
 }

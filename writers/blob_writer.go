@@ -45,7 +45,7 @@ type BlobWriter struct {
 }
 
 // NewBlobWriter creates a BlobWriter for the given definition and blob credentials.
-// It creates the Azure container if it does not already exist and uploads a type.json
+// It creates the Azure container if it does not already exist and uploads a {typeName}.json
 // blob describing the stored item structure.
 // writerBatchSize controls how many CSV lines trigger an immediate flush.
 func NewBlobWriter(cfg pipeline.BlobConfig, def items.ItemDefinition, writerBatchSize int) (*BlobWriter, error) {
@@ -68,15 +68,15 @@ func NewBlobWriter(cfg pipeline.BlobConfig, def items.ItemDefinition, writerBatc
 
 	schema, err := items.StoredItemDefinition(def)
 	if err != nil {
-		return nil, fmt.Errorf("writers: build type.json for %s: %w", def.TypeName, err)
+		return nil, fmt.Errorf("writers: build %s.json for %s: %w", def.TypeName, def.TypeName, err)
 	}
-	typeJSONURL := fmt.Sprintf("https://%s.blob.core.windows.net/%s/type.json", cfg.AccountName, def.Folder)
+	typeJSONURL := fmt.Sprintf("https://%s.blob.core.windows.net/%s/%s.json", cfg.AccountName, def.Folder, def.TypeName)
 	bbClient, err := blockblob.NewClientWithSharedKeyCredential(typeJSONURL, cred, nil)
 	if err != nil {
-		return nil, fmt.Errorf("writers: create type.json blob client for %s: %w", def.TypeName, err)
+		return nil, fmt.Errorf("writers: create %s.json blob client for %s: %w", def.TypeName, def.TypeName, err)
 	}
 	if _, err = bbClient.UploadBuffer(context.Background(), schema, nil); err != nil {
-		return nil, fmt.Errorf("writers: upload type.json for %s: %w", def.TypeName, err)
+		return nil, fmt.Errorf("writers: upload %s.json for %s: %w", def.TypeName, def.TypeName, err)
 	}
 
 	maxAge := time.Duration(def.Latency) * time.Minute

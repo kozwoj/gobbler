@@ -362,13 +362,13 @@ func CheckFileName(fileName string) error {
 	return nil // valid name
 }
 
-// storedColumn is the simplified column descriptor written to type.json.
+// storedColumn is the simplified column descriptor written to {typeName}.json.
 type storedColumn struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
 }
 
-// storedItemDef is the simplified item definition written to type.json alongside
+// storedItemDef is the simplified item definition written to {typeName}.json alongside
 // the CSV data files/blobs so that query tools know the record structure.
 type storedItemDef struct {
 	Name           string         `json:"name"`
@@ -376,7 +376,7 @@ type storedItemDef struct {
 }
 
 // StoredItemDefinition returns the JSON bytes of the simplified item definition
-// written as type.json in every directory/container that holds CSV data for def.
+// written as {typeName}.json in every directory/container that holds CSV data for def.
 // A "timestamp" (datetime) column is always prepended as the first column,
 // reflecting the ingest timestamp Gobbler adds to every CSV record.
 func StoredItemDefinition(def ItemDefinition) ([]byte, error) {

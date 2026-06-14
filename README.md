@@ -99,9 +99,9 @@ In addition to the user-defined fields Gobbler adds, as the first field, a time 
 
 While a log file/blog is opened for receiving new items it should not be used for analysis, like opening it in a spreadsheet or uploading it to Kusto. The property `latencyMinutes` of item definition declares after what time, since creation of the current file/blob, Gobbler should rotate it (close the current one and open a new one with a new time stamp). Gobbler provides a function to force rotation of a current file/blob if it is needed for analysis sooner than its latency would imply.
 
-### Item type definition file (`type.json`)
+### Item type definition file (`{typeName}.json`)
 
-When Gobbler creates directory or Azure container for an item type — either at pipeline start or when a definition is hot-added to a running pipeline — it writes a file named `type.json` to that directory/container. The file describes the record structure of the CSV data stored alongside it, so that query tools can parse the files without needing access to the Gobbler instance that produced them.
+When Gobbler creates a directory or Azure container for an item type — either at pipeline start or when a definition is hot-added to a running pipeline — it writes a file named `{typeName}.json` (e.g. `vm-shutdown.json`) to that directory/container. The file describes the record structure of the CSV data stored alongside it, so that query tools can parse the files without needing access to the Gobbler instance that produced them.
 
 The file contains a single JSON object with two fields:
 - `name` — the item type name (the same as the second part of the file/blob name)
@@ -121,7 +121,7 @@ The `timestamp` column (added by Gobbler at ingest time) is always listed first.
 }
 ```
 
-If the pipeline is stopped, the definition removed, and a new definition with a different schema added under the same name, the existing directory/container for the type should be renamed or deleted — otherwise `type.json` will be overwritten in the existing directory with the new schema, while the older CSV files still contain items with old definition.
+If the pipeline is stopped, the definition removed, and a new definition with a different schema added under the same name, the existing directory/container for the type should be renamed or deleted — otherwise `{typeName}.json` will be overwritten in the existing directory with the new schema, while the older CSV files still contain items with the old definition.
 
 ### The ingestion pipeline
 
