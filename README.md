@@ -1,6 +1,32 @@
 # Gobbler Overview
 
-**Gobbler** is a configurable telemetry ingestion pipeline server written in Go. There are two aspects of Gobbler's configurability 
+**Gobbler** is a configurable telemetry ingestion pipeline server written in Go. It is a component of the Gobbler telemetry suite that has three parts:
+
+```mermaid
+flowchart LR
+    classDef thick stroke-width:3px,stroke:#222;
+
+    B:::thick
+    C:::thick
+
+    A["Application\n(with gobbler-client)"]
+    B["Gobbler Server\n(gobbler ingestion pipeline)"]
+    C[("Storage\n(CSV files or Azure Blobs)")]
+    D["GQL Query Engine\n(gobbler-query)"]
+
+    A -->|"HTTP POST /ingest"| B
+    B -->|"timestamped CSV items"| C
+    C -->|"gq query run '...'"| D
+```
+
+| Component | Repository | Role |
+|---|---|---|
+| **gobbler-client** | [kozwoj/gobbler-client](https://github.com/kozwoj/gobbler-client) | Go SDK — used to instrument applications |
+| **gobbler** | *this repo* | Server — accepts, validates, buffers, and flushes telemetry items to storage |
+| **gobbler-query** | [kozwoj/gobbler-query](https://github.com/kozwoj/gobbler-query) | GQL Query Engine — analyzes stored telemetry with GQL |
+ 
+
+There are two aspects of Gobbler's configurability 
 1. Before staring the pipeline the user can set up server's operational parameters like target storage (files vs. Azure blobs), ingestion queue sizes, batch sizes, and operational logging 
    
 2. Before starting the pipeline, but also when it is running, the user can add definitions of the structure of telemetry items to be ingested and stored by Gobbler. 
