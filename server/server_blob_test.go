@@ -168,6 +168,25 @@ func waitForBlobCount(t *testing.T, sec blobSecrets, container string, minBlobs 
 	return count
 }
 
+// blobExists returns true if a blob with the given name exists in the container.
+func blobExists(t *testing.T, sec blobSecrets, container, blobName string) bool {
+	t.Helper()
+	cred, err := azblob.NewSharedKeyCredential(sec.AccountName, sec.AccountKey)
+	if err != nil {
+		t.Errorf("blobExists: credentials: %v", err)
+		return false
+	}
+	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", sec.AccountName)
+	client, err := azblob.NewClientWithSharedKeyCredential(serviceURL, cred, nil)
+	if err != nil {
+		t.Errorf("blobExists: service client: %v", err)
+		return false
+	}
+	blobClient := client.ServiceClient().NewContainerClient(container).NewBlockBlobClient(blobName)
+	_, err = blobClient.GetProperties(context.Background(), nil)
+	return err == nil
+}
+
 // deleteContainer removes the named Azure container and all its contents.
 // Silently ignores errors (e.g. container not found) — safe to call from t.Cleanup.
 func deleteContainer(sec blobSecrets, container string) {
@@ -340,6 +359,16 @@ func TestBlobC_HappyPath(t *testing.T) {
 			if count == 0 {
 				t.Errorf("expected at least one blob in container %q, found none", container)
 			}
+		}
+	})
+
+	// C9b — schema files uploaded: {typeName}.json must exist in each container
+	t.Run("C9b_SchemaBlobs", func(t *testing.T) {
+		if !blobExists(t, sec, alphaContainer, "alpha.json") {
+			t.Errorf("expected alpha.json in container %q", alphaContainer)
+		}
+		if !blobExists(t, sec, betaContainer, "beta.json") {
+			t.Errorf("expected beta.json in container %q", betaContainer)
 		}
 	})
 
