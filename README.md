@@ -38,7 +38,7 @@ Gobbler ingests and stores only telemetry items that have been defined and added
   "name": "vm-shutdown",
   "documentation": "virtual machine shutdown event",
   "folder": "administration",
-  "m": 10,
+  "latencyMinutes": 10,
   "orderedColumns": 
       [
         { "name": "vmId", "type": "string" },

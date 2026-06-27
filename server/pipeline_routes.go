@@ -52,6 +52,8 @@ func (s *Server) handlePipelineConfigure(w http.ResponseWriter, r *http.Request)
 		AccountKey      string `json:"accountKey"`
 		WriterQueueSize int    `json:"writerQueueSize"`
 		WriterBatchSize int    `json:"writerBatchSize"`
+		// Instance identity — required when self-logging is used.
+		InstanceName string `json:"instanceName"`
 		// Optional self-logging client configuration.
 		LoggerEndpoint      string   `json:"loggerEndpoint"`
 		LoggerTypes         []string `json:"loggerTypes"`
@@ -60,6 +62,11 @@ func (s *Server) handlePipelineConfigure(w http.ResponseWriter, r *http.Request)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sendError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	if req.InstanceName == "" {
+		sendError(w, http.StatusBadRequest, "instanceName is required")
 		return
 	}
 
@@ -86,6 +93,7 @@ func (s *Server) handlePipelineConfigure(w http.ResponseWriter, r *http.Request)
 		AccountKey:          req.AccountKey,
 		WriterQueueSize:     req.WriterQueueSize,
 		WriterBatchSize:     req.WriterBatchSize,
+		InstanceName:        req.InstanceName,
 		LoggerEndpoint:      req.LoggerEndpoint,
 		LoggerTypes:         req.LoggerTypes,
 		LoggerBatchSize:     req.LoggerBatchSize,
@@ -169,7 +177,7 @@ func (s *Server) handlePipelineStart(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_ = s.logger.Log("gobbler-pipeline-event", map[string]any{"event": "start"})
+	_ = s.logger.Log("gobbler-pipeline-event", map[string]any{"event": "start", "instanceName": s.config.InstanceName})
 
 	sendJSON(w, map[string]string{"status": "ok"})
 }
@@ -201,7 +209,7 @@ func (s *Server) handlePipelineStop(w http.ResponseWriter, r *http.Request) {
 	pipeline.Reset()
 
 	// Close the self-logger (flushes buffered items) and reset to Nop.
-	_ = s.logger.Log("gobbler-pipeline-event", map[string]any{"event": "stop"})
+	_ = s.logger.Log("gobbler-pipeline-event", map[string]any{"event": "stop", "instanceName": s.config.InstanceName})
 	_ = s.logger.Close(r.Context())
 	s.logger = gobblerclient.Nop()
 	s.loggerConfigured = false
@@ -234,7 +242,7 @@ func (s *Server) handlePipelineRotate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entry.writer.Rotate()
-	_ = s.logger.Log("gobbler-pipeline-event", map[string]any{"event": "rotate", "itemType": req.TypeName})
+	_ = s.logger.Log("gobbler-pipeline-event", map[string]any{"event": "rotate", "itemType": req.TypeName, "instanceName": s.config.InstanceName})
 	sendJSON(w, map[string]string{"status": "ok"})
 }
 
@@ -299,6 +307,7 @@ func (s *Server) handlePipelineConfigureHelp(w http.ResponseWriter, r *http.Requ
 			"accountKey":          "string - required when mode is \"blob\"",
 			"writerQueueSize":     "integer",
 			"writerBatchSize":     "integer",
+			"instanceName":        "string - required; unique name for this Gobbler instance (used in telemetry to identify the source)",
 			"loggerEndpoint":      "string - optional; URL of a Gobbler server to receive this server's operational events",
 			"loggerTypes":         "array of strings - optional; item type names the logger will emit",
 			"loggerBatchSize":     "integer - optional; client batch size (default 100)",

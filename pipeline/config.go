@@ -19,6 +19,11 @@ type Config struct {
 	WriterQueueSize int
 	WriterBatchSize int
 
+	// InstanceName identifies this Gobbler instance in telemetry emitted to a
+	// logging Gobbler server. Required when LoggerEndpoint is set; must be
+	// unique across all instances sharing the same logging server.
+	InstanceName string
+
 	// Optional self-logging: when LoggerEndpoint is non-empty the server
 	// constructs a gobbler-client that ships its own operational events to a
 	// separate Gobbler instance for analysis.

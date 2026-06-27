@@ -132,8 +132,9 @@ Sets the pipeline's storage mode, storage credentials/path, queue sizes, and wri
   "accountKey":      "",
   "writerQueueSize": 100,
   "writerBatchSize": 50,
+  "instanceName":        "db-prod-1",
   "loggerEndpoint":      "http://collector:8080",
-  "loggerTypes":         ["gobbler.ingest", "gobbler.pipeline"],
+  "loggerTypes":         ["gobbler-ingest-event", "gobbler-pipeline-event"],
   "loggerBatchSize":     100,
   "loggerFlushInterval": "30s"
 }
@@ -145,6 +146,7 @@ Field rules:
 - `accountName`, `accountKey` — both required when `mode` is `"blob"`.
 - `writerQueueSize` — capacity of each per-type writer's internal channel.
 - `writerBatchSize` — number of CSV rows accumulated before the writer flushes to storage.
+- `instanceName` — required; a unique human-readable name for this Gobbler instance (e.g. `"db-prod-1"`). Stamped on every telemetry item emitted to the logger. Must be unique across all instances sharing the same logger server.
 - `loggerEndpoint` — optional; URL of a separate Gobbler server that will receive this server's own operational events. When omitted, self-logging is disabled.
 - `loggerTypes` — optional array of item type name strings the self-logging client will emit. Only meaningful when `loggerEndpoint` is set. Standard types (defined in [`docs/JSON-schemas.md`](JSON-schemas.md#3-self-logging-item-definitions)): `"gobbler-ingest-event"`, `"gobbler-writer-flush"`, `"gobbler-writer-error"`, `"gobbler-pipeline-event"`. These types must already be registered on the target logger Gobbler instance.
 - `loggerBatchSize` — optional; batch size for the self-logging client. Defaults to `100` when omitted or `0`.

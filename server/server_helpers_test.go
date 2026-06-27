@@ -104,6 +104,7 @@ func configureFileMode(t *testing.T, router http.Handler, outputDir string) {
 		"outputDir":       outputDir,
 		"writerQueueSize": 200,
 		"writerBatchSize": 50,
+		"instanceName":    "test-instance",
 	})
 	w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure", string(cfgBytes))
 	if w.Code != http.StatusOK {

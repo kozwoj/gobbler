@@ -97,6 +97,7 @@ Add-Definition @{
     folder        = 'gobbler-ingest'
     latencyMinutes = 5
     orderedColumns = @(
+        @{ name = 'instanceName'; type = 'string'; optional = $false }
         @{ name = 'requestId';  type = 'string'; optional = $true  }
         @{ name = 'itemsIn';    type = 'int';    optional = $false }
         @{ name = 'ingested';   type = 'int';    optional = $false }
@@ -112,6 +113,7 @@ Add-Definition @{
     folder        = 'gobbler-writer'
     latencyMinutes = 5
     orderedColumns = @(
+        @{ name = 'instanceName'; type = 'string'; optional = $false }
         @{ name = 'itemType';     type = 'string'; optional = $false }
         @{ name = 'output';       type = 'string'; optional = $true  }
         @{ name = 'itemsFlushed'; type = 'int';    optional = $false }
@@ -124,6 +126,7 @@ Add-Definition @{
     folder        = 'gobbler-writer'
     latencyMinutes = 5
     orderedColumns = @(
+        @{ name = 'instanceName'; type = 'string'; optional = $false }
         @{ name = 'itemType';  type = 'string'; optional = $false }
         @{ name = 'operation'; type = 'string'; optional = $false }
         @{ name = 'errorMsg';  type = 'string'; optional = $false }
@@ -136,6 +139,7 @@ Add-Definition @{
     folder        = 'gobbler-pipeline'
     latencyMinutes = 5
     orderedColumns = @(
+        @{ name = 'instanceName'; type = 'string'; optional = $false }
         @{ name = 'event';    type = 'string'; optional = $false }
         @{ name = 'itemType'; type = 'string'; optional = $true  }
     )
@@ -149,6 +153,7 @@ $configResult = Invoke-Gobbler -Method POST -Path 'pipeline/configure' -Body @{
     outputDir       = $OutputDir
     writerBatchSize = $BatchSize
     writerQueueSize = $QueueSize
+    instanceName    = 'gobbler-logger'
 }
 if ($configResult.status -ne 'ok') {
     throw "Configure failed: $($configResult | ConvertTo-Json)"

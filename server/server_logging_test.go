@@ -185,6 +185,9 @@ func TestPL1_PipelineLogging_Start(t *testing.T) {
 	if call.fields["event"] != "start" {
 		t.Errorf("event = %v, want start", call.fields["event"])
 	}
+	if call.fields["instanceName"] != "test-instance" {
+		t.Errorf("instanceName = %v, want test-instance", call.fields["instanceName"])
+	}
 }
 
 // PL2: handlePipelineStop emits event="stop" before the logger is closed.
@@ -208,6 +211,9 @@ func TestPL2_PipelineLogging_Stop(t *testing.T) {
 	}
 	if call.fields["event"] != "stop" {
 		t.Errorf("event = %v, want stop", call.fields["event"])
+	}
+	if call.fields["instanceName"] != "test-instance" {
+		t.Errorf("instanceName = %v, want test-instance", call.fields["instanceName"])
 	}
 }
 
@@ -233,6 +239,9 @@ func TestPL3_PipelineLogging_Rotate(t *testing.T) {
 	}
 	if call.fields["itemType"] != "alpha" {
 		t.Errorf("itemType = %v, want alpha", call.fields["itemType"])
+	}
+	if call.fields["instanceName"] != "test-instance" {
+		t.Errorf("instanceName = %v, want test-instance", call.fields["instanceName"])
 	}
 }
 

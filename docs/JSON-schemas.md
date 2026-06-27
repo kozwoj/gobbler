@@ -26,7 +26,8 @@ Configuration object is sent to Gobbler instance as the body of `POST /gobbler/p
     "loggerEndpoint": {"type": "string", "optional": true},
     "loggerTypes": {"type": "array", "items": {"type": "string"}, "optional": true},
     "loggerBatchSize": {"type": "integer", "optional": true},
-    "loggerFlushInterval": {"type": "string", "optional": true}
+    "loggerFlushInterval": {"type": "string", "optional": true},
+    "instanceName": {"type": "string", "optional": false}
   }
 }
 ```
@@ -43,6 +44,7 @@ Configuration object is sent to Gobbler instance as the body of `POST /gobbler/p
 | `loggerTypes`        | array of string | no       | Item type names that must be register with logger Gobbler instance |
 | `loggerBatchSize`    | integer         | no       | Maximum log items sent per batch to the logger (defaults to `100`) |
 | `loggerFlushInterval`| string          | no       | Go duration string (e.g. `"10s"`) between logger flushes |
+| `instanceName`       | string          | yes      | Unique name for this Gobbler instance; required when `loggerEndpoint` is set; stamped on every telemetry item |
 
 **Example — blob mode with logging enabled:**
 
@@ -146,14 +148,15 @@ These 4 item types must be registered with the `logger` instance before the `ing
 
 One telemetry item of this type is emitted per each `POST /gobbler/ingest` request.
 
-| Field        | Type   | Optional | Description |
-|--------------|--------|----------|-------------|
-| `requestId`  | string | yes      | Correlation ID for the request |
-| `itemsIn`    | int    | no       | Total items received in the batch |
-| `ingested`   | int    | no       | Items accepted by the pipeline |
-| `rejected`   | int    | no       | Items in the rejected list |
-| `statusCode` | int    | no       | HTTP response status (`200` or `400`) |
-| `durationMs` | int    | no       | Handler wall time in milliseconds |
+| Field          | Type   | Optional | Description |
+|----------------|--------|----------|-----------------|
+| `instanceName` | string | no       | Name of the Gobbler instance that produced this event |
+| `requestId`    | string | yes      | Correlation ID for the request |
+| `itemsIn`      | int    | no       | Total items received in the batch |
+| `ingested`     | int    | no       | Items accepted by the pipeline |
+| `rejected`     | int    | no       | Items in the rejected list |
+| `statusCode`   | int    | no       | HTTP response status (`200` or `400`) |
+| `durationMs`   | int    | no       | Handler wall time in milliseconds |
 
 ```json
 {
@@ -162,12 +165,13 @@ One telemetry item of this type is emitted per each `POST /gobbler/ingest` reque
   "folder": "gobbler-ingest",
   "latencyMinutes": 5,
   "orderedColumns": [
-    { "name": "requestId",  "type": "string", "optional": true  },
-    { "name": "itemsIn",    "type": "int",    "optional": false },
-    { "name": "ingested",   "type": "int",    "optional": false },
-    { "name": "rejected",   "type": "int",    "optional": false },
-    { "name": "statusCode", "type": "int",    "optional": false },
-    { "name": "durationMs", "type": "int",    "optional": false }
+    { "name": "instanceName", "type": "string", "optional": false },
+    { "name": "requestId",    "type": "string", "optional": true  },
+    { "name": "itemsIn",      "type": "int",    "optional": false },
+    { "name": "ingested",     "type": "int",    "optional": false },
+    { "name": "rejected",     "type": "int",    "optional": false },
+    { "name": "statusCode",   "type": "int",    "optional": false },
+    { "name": "durationMs",   "type": "int",    "optional": false }
   ]
 }
 ```
@@ -179,7 +183,8 @@ One telemetry item of this type is emitted per each `POST /gobbler/ingest` reque
 One telemetry items of this type is emitted per each successful writer flush (`FileWriter` or `BlobWriter`).
 
 | Field          | Type   | Optional | Description |
-|----------------|--------|----------|-------------|
+|----------------|--------|----------|-----------------|
+| `instanceName` | string | no       | Name of the Gobbler instance that produced this event |
 | `itemType`     | string | no       | Item type being flushed |
 | `output`       | string | yes      | Active file path or blob name |
 | `itemsFlushed` | int    | no       | Number of CSV lines written in this flush |
@@ -191,6 +196,7 @@ One telemetry items of this type is emitted per each successful writer flush (`F
   "folder": "gobbler-writer",
   "latencyMinutes": 5,
   "orderedColumns": [
+    { "name": "instanceName", "type": "string", "optional": false },
     { "name": "itemType",     "type": "string", "optional": false },
     { "name": "output",       "type": "string", "optional": true  },
     { "name": "itemsFlushed", "type": "int",    "optional": false }
@@ -204,11 +210,12 @@ One telemetry items of this type is emitted per each successful writer flush (`F
 
 One telemetry item of this type is emitted per each writer error (flush, rotate, or open failure).
 
-| Field       | Type   | Optional | Description |
-|-------------|--------|----------|-------------|
-| `itemType`  | string | no       | Item type whose writer encountered the error |
-| `operation` | string | no       | One of: `"flush"`, `"rotate"`, `"open"` |
-| `errorMsg`  | string | no       | Error message string |
+| Field          | Type   | Optional | Description |
+|----------------|--------|----------|-----------------|
+| `instanceName` | string | no       | Name of the Gobbler instance that produced this event |
+| `itemType`     | string | no       | Item type whose writer encountered the error |
+| `operation`    | string | no       | One of: `"flush"`, `"rotate"`, `"open"` |
+| `errorMsg`     | string | no       | Error message string |
 
 ```json
 {
@@ -217,9 +224,10 @@ One telemetry item of this type is emitted per each writer error (flush, rotate,
   "folder": "gobbler-writer",
   "latencyMinutes": 5,
   "orderedColumns": [
-    { "name": "itemType",  "type": "string", "optional": false },
-    { "name": "operation", "type": "string", "optional": false },
-    { "name": "errorMsg",  "type": "string", "optional": false }
+    { "name": "instanceName", "type": "string", "optional": false },
+    { "name": "itemType",     "type": "string", "optional": false },
+    { "name": "operation",    "type": "string", "optional": false },
+    { "name": "errorMsg",     "type": "string", "optional": false }
   ]
 }
 ```
@@ -230,10 +238,11 @@ One telemetry item of this type is emitted per each writer error (flush, rotate,
 
 One telemetry item of this type is emitted per pipeline lifecycle event : `start`, `stop` or `rotate`.
 
-| Field      | Type   | Optional | Description |
-|------------|--------|----------|-------------|
-| `event`    | string | no       | One of: `"start"`, `"stop"`, `"rotate"` |
-| `itemType` | string | yes      | Relevant type name for `"rotate"` events; empty otherwise |
+| Field          | Type   | Optional | Description |
+|----------------|--------|----------|-----------------|
+| `instanceName` | string | no       | Name of the Gobbler instance that produced this event |
+| `event`        | string | no       | One of: `"start"`, `"stop"`, `"rotate"` |
+| `itemType`     | string | yes      | Relevant type name for `"rotate"` events; empty otherwise |
 
 ```json
 {
@@ -242,8 +251,9 @@ One telemetry item of this type is emitted per pipeline lifecycle event : `start
   "folder": "gobbler-pipeline",
   "latencyMinutes": 5,
   "orderedColumns": [
-    { "name": "event",    "type": "string", "optional": false },
-    { "name": "itemType", "type": "string", "optional": true  }
+    { "name": "instanceName", "type": "string", "optional": false },
+    { "name": "event",        "type": "string", "optional": false },
+    { "name": "itemType",     "type": "string", "optional": true  }
   ]
 }
 ```

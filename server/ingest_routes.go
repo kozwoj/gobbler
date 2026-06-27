@@ -135,13 +135,15 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 func (s *Server) logIngestEvent(r *http.Request, itemsIn, ingested, rejected, statusCode int, start time.Time) {
 	s.mu.RLock()
 	logger := s.logger
+	instanceName := s.config.InstanceName
 	s.mu.RUnlock()
 	_ = logger.Log("gobbler-ingest-event", map[string]any{
-		"requestId":  middleware.GetReqID(r.Context()),
-		"itemsIn":    itemsIn,
-		"ingested":   ingested,
-		"rejected":   rejected,
-		"statusCode": statusCode,
-		"durationMs": time.Since(start).Milliseconds(),
+		"instanceName": instanceName,
+		"requestId":    middleware.GetReqID(r.Context()),
+		"itemsIn":      itemsIn,
+		"ingested":     ingested,
+		"rejected":     rejected,
+		"statusCode":   statusCode,
+		"durationMs":   time.Since(start).Milliseconds(),
 	})
 }
