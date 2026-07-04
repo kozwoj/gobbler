@@ -47,11 +47,11 @@ Parses, validates, and registers a new item type definition. If the pipeline is 
 ```
 
 Field notes:
-- `name` — required; used as the type identifier in ingest calls. Must be a valid file/directory name (no path separators etc.). The reserved name `timestamp` is rejected.
+- `name` — required; used as the type identifier in ingest calls. Must be a valid file/directory name (no path separators etc.). The reserved name `ingest_time` is rejected.
 - `documentation` — optional string; ignored by the pipeline.
 - `folder` — optional; names the output subdirectory (file mode) or container (blob mode). Defaults to the value of `name` when omitted.
 - `latencyMinutes` — optional non-negative integer; defaults to `1`.
-- `orderedColumns` — required, non-empty array. Column order determines CSV column order. Column `name` `"timestamp"` is reserved. Supported `type` values: `"bool"`, `"datetime"`, `"dynamic"`, `"int"`, `"real"`, `"string"`, `"timespan"`.
+- `orderedColumns` — required, non-empty array. Column order determines CSV column order. Column `name` `"ingest_time"` is reserved. Supported `type` values: `"bool"`, `"datetime"`, `"dynamic"`, `"int"`, `"real"`, `"string"`, `"timespan"`.
 
 **Responses:**
 

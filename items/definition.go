@@ -69,12 +69,12 @@ func CreateItemDefinition(def string, itemDef *ItemDefinition) error {
 	*/
 	// check if definition contains required name field of type string
 	if name, ok := m["name"].(string); ok {
+		// check that the name is not the reserved name "ingest_time" before file-name validation
+		if name == "ingest_time" {
+			return NewDefinitionError("name", name, ErrReservedName)
+		}
 		// check if the name can be used to create a directory/file name
 		if err := CheckFileName(name); err == nil {
-			// check that the name is not reserved name "timestamp"
-			if name == "timestamp" {
-				return NewDefinitionError("name", name, ErrReservedName)
-			}
 			itemDef.TypeName = name
 		} else {
 			return NewDefinitionError("name", name, ErrInvalidFileName)
@@ -157,7 +157,7 @@ func GetColumnDefinition(column interface{}) (Column, error) {
 
 		// check if the colMap contains name field of type string
 		if name, ok := colMap["name"].(string); ok {
-			if name == "timestamp" {
+			if name == "ingest_time" {
 				return cld, NewColumnError("name", name, ErrReservedName)
 			}
 			cld.Name = name
@@ -381,7 +381,7 @@ type storedItemDef struct {
 // reflecting the ingest timestamp Gobbler adds to every CSV record.
 func StoredItemDefinition(def ItemDefinition) ([]byte, error) {
 	cols := make([]storedColumn, 0, len(def.Columns)+1)
-	cols = append(cols, storedColumn{Name: "timestamp", Type: "datetime"})
+	cols = append(cols, storedColumn{Name: "ingest_time", Type: "datetime"})
 	for _, c := range def.Columns {
 		cols = append(cols, storedColumn{Name: c.Name, Type: ColumnTypesMap[c.ValueType]})
 	}

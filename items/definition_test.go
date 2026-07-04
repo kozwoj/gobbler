@@ -133,7 +133,7 @@ func TestError_MissingName(t *testing.T) {
 }
 
 func TestError_ReservedName_Timestamp(t *testing.T) {
-	mustFail(t, `{"name": "timestamp", "orderedColumns": [{"name": "f1", "type": "string"}]}`, ErrReservedName)
+	mustFail(t, `{"name": "ingest_time", "orderedColumns": [{"name": "f1", "type": "string"}]}`, ErrReservedName)
 }
 
 func TestError_InvalidName_Uppercase(t *testing.T) {
@@ -179,7 +179,7 @@ func TestError_DuplicateColumnName(t *testing.T) {
 }
 
 func TestError_ReservedColumnName_Timestamp(t *testing.T) {
-	json := `{"name": "mytype", "orderedColumns": [{"name": "timestamp", "type": "string"}]}`
+	json := `{"name": "mytype", "orderedColumns": [{"name": "ingest_time", "type": "string"}]}`
 	mustFail(t, json, ErrReservedName)
 }
 
@@ -355,8 +355,8 @@ func TestStoredItemDefinition_TimestampPrepended(t *testing.T) {
 		t.Fatalf("column count: got %d, want 3", len(got.OrderedColumns))
 	}
 	first := got.OrderedColumns[0]
-	if first.Name != "timestamp" || first.Type != "datetime" {
-		t.Errorf("first column: got {%q %q}, want {timestamp datetime}", first.Name, first.Type)
+	if first.Name != "ingest_time" || first.Type != "datetime" {
+		t.Errorf("first column: got {%q %q}, want {ingest_time datetime}", first.Name, first.Type)
 	}
 }
 
@@ -377,7 +377,7 @@ func TestStoredItemDefinition_ColumnOrder(t *testing.T) {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	want := []storedColumn{
-		{Name: "timestamp", Type: "datetime"},
+		{Name: "ingest_time", Type: "datetime"},
 		{Name: "a", Type: "int"},
 		{Name: "b", Type: "bool"},
 		{Name: "c", Type: "dynamic"},

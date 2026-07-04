@@ -287,7 +287,7 @@ func TestWL7_NewFileWriter_TypeJSON(t *testing.T) {
 		t.Errorf("name: got %q, want %q", got.Name, "alpha")
 	}
 	want := []typeJSONColumn{
-		{Name: "timestamp", Type: "datetime"},
+		{Name: "ingest_time", Type: "datetime"},
 		{Name: "alphaStr", Type: "string"},
 		{Name: "alphaInt", Type: "int"},
 	}
@@ -375,7 +375,7 @@ func TestWL8_NewBlobWriter_TypeJSON(t *testing.T) {
 		t.Errorf("name: got %q, want %q", got.Name, "wl8type")
 	}
 	wantCols := []typeJSONColumn{
-		{Name: "timestamp", Type: "datetime"},
+		{Name: "ingest_time", Type: "datetime"},
 		{Name: "vmId", Type: "string"},
 		{Name: "count", Type: "int"},
 	}

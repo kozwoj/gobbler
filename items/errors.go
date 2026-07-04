@@ -12,7 +12,7 @@ var (
 	ErrInvalidTimespan          = errors.New("invalid timespan format")
 	ErrEmptyFileName            = errors.New("fileName cannot be empty")
 	ErrInvalidFileName          = errors.New("invalid fileName format")
-	ErrReservedName             = errors.New("\"timestamp\" is a reserved name")
+	ErrReservedName             = errors.New("\"ingest_time\" is a reserved name")
 	ErrMissingNameField         = errors.New("name field is missing or invalid")
 	ErrInvalidDocumentation     = errors.New("documentation field is not a string")
 	ErrInvalidFolderField       = errors.New("folder field is invalid")
@@ -25,10 +25,10 @@ var (
 	ErrMissingColumnType        = errors.New("field type value missing or not a string")
 	ErrInconsistentDefaultValue = errors.New("defaultValue inconsistent with column type")
 	ErrInvalidDefaultDateTime   = errors.New("defaultValue is not correctly formed datetime")
-	ErrFolderTooShort            = errors.New("folder name must be at least 3 characters")
-	ErrDuplicateColumnName       = errors.New("duplicate column name")
-	ErrDefinitionAlreadyExists   = errors.New("definition with this name already exists")
-	ErrDefinitionNotFound        = errors.New("definition not found")
+	ErrFolderTooShort           = errors.New("folder name must be at least 3 characters")
+	ErrDuplicateColumnName      = errors.New("duplicate column name")
+	ErrDefinitionAlreadyExists  = errors.New("definition with this name already exists")
+	ErrDefinitionNotFound       = errors.New("definition not found")
 )
 
 // ItemsError provides context for item definition failures

@@ -1,6 +1,6 @@
 # Gobbler Overview
 
-**Gobbler** is a configurable telemetry ingestion pipeline server written in Go. It is a component of the Gobbler telemetry suite that has three parts:
+**Gobbler** is a configurable ingestion pipeline server <u>for strongly-typed telemetry data</u> written in Go. It is a component of the Gobbler telemetry suite that has three parts:
 
 ```mermaid
 flowchart LR
@@ -27,7 +27,7 @@ flowchart LR
  
 
 There are two aspects of Gobbler's configurability 
-1. Before staring the pipeline the user can set up server's operational parameters like target storage (files vs. Azure blobs), ingestion queue sizes, batch sizes, and operational logging 
+1. Before staring the pipeline the user can set up server's operational parameters like target storage (files vs. Azure blobs), ingestion queue sizes, batch sizes, and operational logging. 
    
 2. Before starting the pipeline, but also when it is running, the user can add definitions of the structure of telemetry items to be ingested and stored by Gobbler. 
 
@@ -56,7 +56,7 @@ Gobbler accepts arrays of JSON objects representing defined items types and
 - appends the buffers to timestamped files/blobs named after item type names, and 
 - rotates the files/blobs on the time interval set in item (`latencyMinutes` property above).
 
-Files/blobs with items of the same type are stored in one directory/container, named after item type name or by the `folder` definition property. File/blob names have the following structure `YYYY-MM-DD_HH-MM-SS.mmm_<typeName>.csv`, where the file timestamp preceding the type name is equal to the timestamp of the first item stored in this file/blob. 
+Files/blobs with items of the same type are stored in one directory/container, named after item type name or by the `folder` definition property. File/blob names have the following structure `YYYY-MM-DD_HH-MM-SS.mmm_<typeName>.csv`, where the file timestamp preceding the type name is equal to the ingestion time property (`ingest_time`) of the first item stored in this file/blob. `ingest_time` property is added to every ingested item by Gobbler, and it is the time when the item was successfully converted to its CSV format. 
 
 This convention makes it convenient for processing the CSV files with analytical DB systems like Kusto (aka Azure Analytics) or DockDB.
 
@@ -121,7 +121,7 @@ A field can be declared as optional or required, and can have a default value. T
 
 The value of `dynamic` fields should be a well-formed JSON object, which is used by Kusto for passing complex values. GOBBLER does not understand the structure of dynamic fields, but it validates that they contain well-formed JSON objects. 
 
-In addition to the user-defined fields Gobbler adds, as the first field, a time stamps. The field is called `timestamp` and contains datetime of when the item was validated and converted to SCV string. This is important when passing CSV strings to analytical DB systems, and therefore the name `timestamp` is reserved (cannot be used in item definitions).  
+In addition to the user-defined fields Gobbler adds, as the first field, a time stamps. The field is called `ingest_time` and contains datetime of when the item was validated and converted to SCV string. This is important when passing CSV strings to analytical DB systems, and therefore the name `ingest_time` is reserved (cannot be used in item definitions).  
 
 While a log file/blog is opened for receiving new items it should not be used for analysis, like opening it in a spreadsheet or uploading it to Kusto. The property `latencyMinutes` of item definition declares after what time, since creation of the current file/blob, Gobbler should rotate it (close the current one and open a new one with a new time stamp). Gobbler provides a function to force rotation of a current file/blob if it is needed for analysis sooner than its latency would imply.
 
@@ -133,13 +133,13 @@ The file contains a single JSON object with two fields:
 - `name` — the item type name (the same as the second part of the file/blob name)
 - `orderedColumns` — the complete, ordered list of columns as they appear in every CSV record
 
-The `timestamp` column (added by Gobbler at ingest time) is always listed first. Example for the test `vm-shutdown` item:
+The `ingest_time` column (added by Gobbler at ingest time) is always listed first. Example for the test `vm-shutdown` item:
 
 ```json
 {
   "name": "vm-shutdown",
   "orderedColumns": [
-    { "name": "timestamp",      "type": "datetime" },
+    { "name": "ingest_time",     "type": "datetime" },
     { "name": "vmId",           "type": "string"   },
     { "name": "shutdownStart",  "type": "datetime" },
     { "name": "shutdownReason", "type": "string"   }
