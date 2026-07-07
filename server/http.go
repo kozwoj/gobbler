@@ -23,6 +23,7 @@ func (s *Server) ListenAndServe(port int) error {
 		r.Route("/definition", s.definitionRoutes)
 		r.Route("/pipeline", s.pipelineRoutes)
 		r.Route("/ingest", s.ingestRoutes)
+		r.Route("/query", s.queryRoutes)
 	})
 
 	addr := fmt.Sprintf(":%d", port)
@@ -37,6 +38,7 @@ func (s *Server) handleRootDiscovery(w http.ResponseWriter, r *http.Request) {
 			"/gobbler/definition",
 			"/gobbler/pipeline",
 			"/gobbler/ingest",
+			"/gobbler/query",
 		},
 		"help": "Add trailing slash to a group or command path for a description",
 	})

@@ -109,6 +109,7 @@ func (s *Server) handlePipelineConfigure(w http.ResponseWriter, r *http.Request)
 	}
 
 	s.config = cfg
+	s.rebuildCatalog()
 	sendJSON(w, map[string]string{"status": "ok"})
 }
 
@@ -151,6 +152,7 @@ func (s *Server) handlePipelineStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.running = true
+	s.rebuildCatalog()
 
 	// Construct the self-logger. Soft failure: the pipeline always starts even
 	// if gobblerclient.New() fails (e.g. logger server unreachable / types missing).

@@ -64,6 +64,7 @@ func newTestRouter(s *Server) http.Handler {
 		r.Route("/definition", s.definitionRoutes)
 		r.Route("/pipeline", s.pipelineRoutes)
 		r.Route("/ingest", s.ingestRoutes)
+		r.Route("/query", s.queryRoutes)
 	})
 	return r
 }

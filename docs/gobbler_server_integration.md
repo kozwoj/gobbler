@@ -17,7 +17,7 @@ Gobbler Server is the next/extended version of `gobbler` that integrates `gobble
 
 ## Monitoring user's gobbler servers
 
-The broader objective is to allow an owner/user to run and monitor **multiple independent Gobbler instances** — each owning its own ingestion pipeline, storage, and query endpoint — while centralising their operational telemetry in a single **logging Gobbler** server. Query integration is a prerequisite for that: once `GET /gobbler/query` exists on every instance, the owner can interrogate any instance's data directly and can query the logging server to correlate telemetry across all instances.
+The broader objective is to allow an owner/user to run and monitor **multiple independent Gobbler instances** — each owning its own ingestion pipeline, storage, and query endpoint — while centralising their operational telemetry in a single **logging Gobbler** server. Query integration is a prerequisite for that: once `POST /gobbler/query` exists on every instance, the owner can interrogate any instance's data directly and can query the logging server to correlate telemetry across all instances.
 
 ---
 
@@ -35,7 +35,9 @@ In the integrated case gobbler can build this mapping from its runtime state and
 
 ### 1. Source of truth for the query catalog: filesystem discovery
 
-The query handler should build and cash the `catalog.Catalog` at **first query** time by **scanning `OutputDir`** for type data directories, not from `s.definitions`.
+The initial version of `catalog.Catalog` should be built by **scanning `OutputDir`** for type data directories and files created by gobbler. This can be done at two points:
+1. when gobbler is configured and is given the `mode` and `OutputDir` to use, or
+2. the query handler builds it during the first query.  
 
 ```
 OutputDir/
@@ -47,18 +49,17 @@ OutputDir/
     ...
 ```
 
-For each subdirectory of `OutputDir`, the handler looks for a `{name}.json` file (written by `FileWriter` at pipeline start). Each one it finds becomes a `catalog.TableEntry`.
+For each subdirectory of `OutputDir` we look for a `{name}.json` file (written by `FileWriter` at pipeline start). Each such file becomes a `catalog.TableEntry`.
 
 Once item definitions are added to gobbler the `catalog.Catalog` should be updated if there is no storage for it yet.
 
-**Why not use `s.definitions`?** Definitions should not be used can be for two reason 
+**Why not use `s.definitions`?** Definitions should not be used for two reason: 
 1. at run time and after the pipeline has been started a definition can be removed while historical CSV data remains. A type removed from the active definition list is still fully queryable — its CSV files and `{typeName}.json` are untouched on disk.
 2. after restart and configuration but before the pipeline was started a query can still be issued against the data collected prior to restart. 
 
-
 ### 2. Precondition for querying
 
-The only server precondition for `GET /gobbler/query` is that the pipeline is **configured** (`s.config != nil`), meaning `OutputDir` (file mode) or blob credentials (blob mode) are known.
+The only server precondition for `POST /gobbler/query` is that the pipeline is **configured** (`s.config != nil`), meaning `OutputDir` (file `mode`) or blob credentials (blob `mode`) are known.
 
 The pipeline does **not** need to be running. Historical data is queryable even after `pipeline/stop`.
 
@@ -114,51 +115,62 @@ An owner may run several "db" Gobbler instances (each with its own storage) and 
 
 ### In `gobbler-query`
 
-Add two discovery functions in `query/catalog/catalog.go`:
+No changes required. `gobbler-query` already exposes everything needed:
+- `catalog.Catalog` (`map[string]*catalog.TableEntry`) and `catalog.TableEntry` — importable types used to describe the query catalog
+- `api.Execute(q string, cat catalog.Catalog, batchSize int) (*api.Result, error)` — the query entry point
 
-**`DiscoverFileCatalog(outputDir string) (catalog.Catalog, error)`**:
-- Walk subdirectories of `outputDir`
-- In each subdir, look for a `*.json` file (there should be exactly one per type)
-- Download and parse the file into 
-``` go
-type typeJSON struct {
-	Name           string `json:"name"`
-	OrderedColumns []struct {
-		Name string `json:"name"`
-		Type string `json:"type"`
-	} `json:"orderedColumns"`
-} 
-```
-(see source.parseSchema() function in gobbler-query ). Verify that it represents item definition.
-- build `TableEntry{TypeName, StorageBucket=subdir, Mode=file, OutputDir}`
-- Return the assembled `Catalog`
-
-**`DiscoverBlobCatalog(accountName, accountKey string) (Catalog, error)`**:
-- List all containers using `azblob.Client.NewListContainersPager`
-- For each container, list blobs to find the `*.json` schema blob(s)
-- Download it and parse it into 
-``` go
-type typeJSON struct {
-	Name           string `json:"name"`
-	OrderedColumns []struct {
-		Name string `json:"name"`
-		Type string `json:"type"`
-	} `json:"orderedColumns"`
-} 
-```
-- Build `TableEntry{TypeName, StorageBucket=containerName, Mode=blob, AccountName, AccountKey}`
-- Return the assembled `Catalog`
+Catalog discovery (walking `OutputDir` or listing Azure containers) will be implemented inside gobbler, not gobbler-query. This keeps gobbler-query unchanged and usable as a standalone query engine.
 
 ### In `gobbler`
 
-Add `github.com/kozwoj/gobbler-query` to `go.mod` (local `replace` directive during dev).
+Add `github.com/kozwoj/gobbler-query` to `go.mod` with a local `replace` directive during development (`replace github.com/kozwoj/gobbler-query => ../gobbler-query`). Remove the directive and pin a tagged version before the first production release.
 
-Add `server/query_routes.go`:
-- `GET /gobbler/query?q=<gql>` handler
-- Calls `catalog.DiscoverFileCatalog(s.config.OutputDir)`
-- Passes the catalog to `api.Execute(q, cat, 0)`
-- Serializes `api.Result` as a JSON array of row objects (`[{"col": val, ...}, ...]`)
-- Error mapping: parse/validation errors → 400, execution errors → 500, not configured → 409
+#### New package: `gobbler/query/`
+
+All query logic that is not HTTP-specific lives here, keeping it independently testable.
+
+**`query/catalog.go`** — catalog discovery:
+
+```go
+type schemaFile struct {
+	Name           string `json:"name"`
+	OrderedColumns []struct {
+		Name string `json:"name"`
+		Type string `json:"type"`
+	} `json:"orderedColumns"`
+}
+```
+
+`BuildFileCatalog(outputDir string) (catalog.Catalog, error)`:
+- Walk subdirectories of `outputDir`
+- In each subdir find the `*.json` schema file (exactly one per type, written by `FileWriter`)
+- Parse it into `schemaFile`; read `Name` as the type name and the subdir name as `StorageBucket`
+- Build `catalog.TableEntry{TypeName, StorageBucket=subdir, Mode=StorageModeFile, OutputDir}`
+- Return the assembled `catalog.Catalog`
+
+`BuildBlobCatalog(accountName, accountKey string) (catalog.Catalog, error)`:
+- List all containers using `azblob.Client.NewListContainersPager`
+- For each container, list blobs to find the `*.json` schema blob
+- Download and parse it into `schemaFile`; use container name as `StorageBucket`
+- Build `catalog.TableEntry{TypeName, StorageBucket=containerName, Mode=StorageModeBlob, AccountName, AccountKey}`
+- Return the assembled `catalog.Catalog`
+
+**`query/result.go`** — result serialisation:
+
+`SerializeResult(r *api.Result) ([]byte, error)`:
+- Converts `api.Result` to a JSON array of row objects: `[{"col": val, ...}, ...]`
+- Uses JSON `null` for null cells (resolved open question — see below)
+
+#### HTTP layer: `server/query_routes.go`
+
+Thin handler, delegates all logic to `gobbler/query`:
+- `POST /gobbler/query` handler
+- Reads `query` from the JSON request body; returns 400 if missing or empty
+- Returns 409 if `s.config == nil` (pipeline not yet configured)
+- Calls `query.BuildFileCatalog(s.config.OutputDir)` or `query.BuildBlobCatalog(...)` based on `s.config.Mode`
+- Calls `api.Execute(q, cat, 0)`
+- On parse/validation error → 400; on execution error → 500
+- On success: writes `application/json` body via `query.SerializeResult`
 
 Register the route in `server/http.go`.
 
@@ -171,7 +183,7 @@ Register the route in `server/http.go`.
 separate `LoadSchema` call is needed. Blob query execution is already fully implemented.
 
 The only additional piece needed for blob integration is catalog discovery:
-`catalog.DiscoverBlobCatalog(accountName, accountKey string) (Catalog, error)` must:
+`BuildBlobCatalog(accountName, accountKey string) (catalog.Catalog, error)` (in `gobbler/query/catalog.go`) must:
 1. List all containers in the storage account using `azblob.Client.NewListContainersPager`
 2. For each container, list blobs to find the `*.json` schema blob
 3. Download it, read the `"name"` field to get the type name
@@ -181,15 +193,61 @@ Blob mode is **not deferred** — it ships with the initial integration.
 
 ---
 
+## Catalog lifecycle
+
+The query catalog is stored as `s.catalog catalog.Catalog` on the `Server` struct, protected by `s.catalogMu sync.RWMutex`. It is never rebuilt per query.
+
+| Event | Catalog action |
+|---|---|
+| `pipeline/configure` | Full build from disk (file mode) or blob scan (blob mode) — captures all historical data before the pipeline is running |
+| `pipeline/start` | Full rebuild — FileWriters/BlobWriters have just created new type dirs/containers |
+| Hot-add (`pipeline/writers/add`) | Add single entry for the new type — no full rescan |
+| `pipeline/stop` | No change — data remains on disk/blob, still fully queryable |
+| Query handler | Read under `RLock` |
+
+`pipeline/configure` and `pipeline/start` happen at most once per setup script run, so a full rebuild there is acceptable. Hot-add is the common runtime event; a targeted single-entry update keeps it cheap. The server has all required information (TypeName, StorageBucket, Mode, credentials) to construct the entry directly after a writer is successfully created.
+
+### Blob catalog validation
+
+When `BuildBlobCatalog` scans a container and finds a `*.json` blob, it validates:
+1. The blob downloads successfully
+2. The content is valid JSON
+3. The JSON has a non-empty `name` field
+4. `orderedColumns` is non-empty
+5. Every column `type` is a recognised gobbler type (`bool`, `datetime`, `dynamic`, `int`, `real`, `string`, `timespan`)
+
+**If all `*.json` blobs in a container fail validation, the container is silently skipped** — it is not a gobbler container. Only containers where at least one blob passes all five checks contribute an entry to the catalog. A container where the blob is present but its JSON is structurally malformed (fails checks 1–2) is skipped with a warning log rather than returning an error, to avoid one corrupted container blocking access to all others.
+
+---
+
 ## Open questions
 
-1. **Result format**: JSON array of row objects is user-friendly but loses null distinction
-   (null vs zero-value). Should the response include an explicit null indicator? Options:
-   - Use JSON `null` for null cells (standard, unambiguous) ← preferred
-   - Separate `nulls` matrix alongside `rows` (matches `api.Result` internal format)
+1. **Result format**: resolved — use JSON `null` for null cells (standard, unambiguous).
 
-2. **Query timeout**: long-running queries block the HTTP request. Should there be a server-side
-   timeout (e.g., via `context.WithTimeout`)? If yes, what default?
+2. **Query timeout**: deferred to a later iteration. No server-side timeout in the initial implementation.
+
+---
+
+## Test data strategy
+
+Server integration tests generate all data live during the test: configure gobbler with a temp `OutputDir`, add a simple definition, start the pipeline, ingest a handful of items via `POST /ingest`, then query via `POST /gobbler/query`. The temp dir is cleaned up after each test.
+
+Rationale: gobbler's query tests validate the **integration** of gobbler-query into gobbler (HTTP layer, catalog discovery, error mapping, stop-then-query). They do not re-test query engine correctness — that is gobbler-query's responsibility and is already covered there. Live-ingested data is sufficient and keeps gobbler fully self-contained with no dependency on gobbler-query's testdata.
+
+## Implementation steps
+
+All tests should pass after each step.
+
+1. **gobbler** — `go.mod`: add `gobbler-query` dependency with local `replace` directive
+2. **gobbler** — `query/catalog.go`: implement `BuildFileCatalog`; add unit tests
+3. **gobbler** — `query/catalog.go`: implement `BuildBlobCatalog`; add integration test (gated on secrets)
+4. **gobbler** — `query/result.go`: implement `SerializeResult`; add unit tests; run `go test ./query/...`
+5. **gobbler** — `server/query_routes.go`: implement `GET /gobbler/query/tables` handler; register in `server/http.go`
+6. **gobbler** — `server/query_routes.go`: implement `POST /gobbler/query` handler; register in `server/http.go`
+7. **gobbler** — add `catalog` field to `Server` struct; wire catalog build into configure, start, and hot-add paths
+8. **gobbler** — add server integration tests for both query endpoints; run `go test ./...`
+
+**note**: tag gobbler-query with version v0.0.1 before removing `replace` directive from go.mod.
 
 ## Portal design
 

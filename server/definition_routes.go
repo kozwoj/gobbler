@@ -67,6 +67,7 @@ func (s *Server) handleDefinitionAdd(w http.ResponseWriter, r *http.Request) {
 			sendError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		s.addCatalogEntry(def)
 	}
 
 	sendJSON(w, map[string]string{"status": "ok"})

@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	gobblerclient "github.com/kozwoj/gobbler-client"
+	gqlcatalog "github.com/kozwoj/gobbler-query/query/catalog"
 	"github.com/kozwoj/gobbler/items"
 	"github.com/kozwoj/gobbler/pipeline"
 	"github.com/kozwoj/gobbler/writers"
@@ -45,6 +46,9 @@ type Server struct {
 
 	// item type registry — definitions are added/removed via gobbler/definition/*
 	definitions items.DefinitionList
+
+	// query catalog — built at configure/start; updated on hot-add (copy-on-write)
+	catalog gqlcatalog.Catalog
 
 	// active type entries — populated when the pipeline is started
 	types map[pipeline.ItemType]*typeEntry

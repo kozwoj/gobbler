@@ -2,8 +2,7 @@ package items
 
 /*
 	DefinitionList is a map of item type name to its ItemDefinition. It is used to store all item definitions
-
-that are available for validating and converting input items.
+	that are available for validating and converting input items.
 */
 type DefinitionList map[string]ItemDefinition
 

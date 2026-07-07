@@ -10,20 +10,23 @@ flowchart LR
     C:::thick
 
     A["Application\n(with gobbler-client)"]
-    B["Gobbler Server\n(gobbler ingestion pipeline)"]
+    B["Gobbler Server\n(ingest + query)"]
     C[("Storage\n(CSV files or Azure Blobs)")]
-    D["GQL Query Engine\n(gobbler-query)"]
+    D["gobbler-query CLI\n(standalone)"]
+    E["Query Client\n(portal / curl)"]
 
-    A -->|"HTTP POST /ingest"| B
+    A -->|"POST /gobbler/ingest"| B
     B -->|"timestamped CSV items"| C
+    B -->|reads| C
+    E -->|"POST /gobbler/query"| B
     C -->|"gq query run '...'"| D
 ```
 
 | Component | Repository | Role |
 |---|---|---|
 | **gobbler-client** | [kozwoj/gobbler-client](https://github.com/kozwoj/gobbler-client) | Go SDK — used to instrument applications |
-| **gobbler** | *this repo* | Server — accepts, validates, buffers, and flushes telemetry items to storage |
-| **gobbler-query** | [kozwoj/gobbler-query](https://github.com/kozwoj/gobbler-query) | GQL Query Engine — analyzes stored telemetry with GQL |
+| **gobbler** | *this repo* | Server — accepts, validates, buffers, and flushes telemetry items to storage; also exposes a GQL query endpoint (`POST /gobbler/query`) over stored data |
+| **gobbler-query** | [kozwoj/gobbler-query](https://github.com/kozwoj/gobbler-query) | GQL query engine — embedded in gobbler and available as a standalone CLI (`gq`) for querying existing data directories |
  
 
 There are two aspects of Gobbler's configurability 
@@ -190,6 +193,10 @@ Gobbler exposes the following REST endpoints under the `/gobbler` prefix (defaul
 **Ingestion**
 - `POST /gobbler/ingest` — ingest an array of typed JSON items (body: `[{"typeName": {...fields}}, ...]`); returns 400 if the body is not a valid JSON array or contains no parseable items, 200 with `{"ingested": N, "rejected": [...]}` otherwise
 
+**Query** (pipeline must be configured; does not need to be running)
+- `GET  /gobbler/query/tables` — list types that are queryable in storage (includes historical types no longer in the active definition list)
+- `POST /gobbler/query` — execute a GQL query against stored data (body: `{"query": "<gql>"}`); returns a JSON array of row objects
+
 More detailed description of the REST interfaces is provides in `docs\REST-commands.md` document.
 
 ## Gobbler Logging
@@ -255,12 +262,12 @@ Use the REST endpoint or any HTTP client. An example using `curl`:
 # File-mode output
 curl -X POST http://localhost:8080/gobbler/pipeline/configure \
      -H "Content-Type: application/json" \
-     -d '{"mode":"file","outputDir":"/tmp/gobbler-out","writerBatchSize":50,"writerQueueSize":100}'
+     -d '{"mode":"file","outputDir":"/tmp/gobbler-out","instanceName":"my-instance","writerBatchSize":50,"writerQueueSize":100}'
 
 # Azure Blob mode
 curl -X POST http://localhost:8080/gobbler/pipeline/configure \
      -H "Content-Type: application/json" \
-     -d '{"mode":"blob","accountName":"<account>","accountKey":"<key>","writerBatchSize":50,"writerQueueSize":100}'
+     -d '{"mode":"blob","accountName":"<account>","accountKey":"<key>","instanceName":"my-instance","writerBatchSize":50,"writerQueueSize":100}'
 ```
 
 Ready-to-run HTTP requests are also available in [tester/docs/gobbler_REST.http](tester/docs/gobbler_REST.http).
@@ -309,7 +316,27 @@ The runner requires the pipeline to be already **configured but not yet running*
 
 > For details on the generator design and supported item types see [tester/docs/generator-design.md](tester/docs/generator-design.md).
 
-### 7. Verify blob connectivity (optional)
+### 7. Query stored data
+
+Once the pipeline has been configured (it does not need to be running), you can query any data stored by this Gobbler instance using GQL.
+
+```bash
+# List queryable types (includes historical types from previous runs)
+curl http://localhost:8080/gobbler/query/tables
+
+# Execute a GQL query — returns a JSON array of row objects
+curl -X POST http://localhost:8080/gobbler/query \
+     -H "Content-Type: application/json" \
+     -d '{"query": "alpha(*) | take 5"}'
+
+curl -X POST http://localhost:8080/gobbler/query \
+     -H "Content-Type: application/json" \
+     -d '{"query": "alpha(*) | where value > 100 | summarize count() by label"}'
+```
+
+For GQL syntax see the [gobbler-query documentation](https://github.com/kozwoj/gobbler-query).
+
+### 8. Verify blob connectivity (optional)
 
 Before running in blob mode, you can validate Azure Storage credentials with the standalone diagnostic tool:
 

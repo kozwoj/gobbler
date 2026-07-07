@@ -16,6 +16,8 @@ Every route group and every command path supports a trailing-slash GET that retu
 | `GET /gobbler/definition/` | list of definition commands |
 | `GET /gobbler/pipeline/` | list of pipeline commands |
 | `GET /gobbler/ingest/` | description of the ingest command |
+| `GET /gobbler/query/` | description of the query command |
+| `GET /gobbler/query/tables/` | description of the tables command |
 | `GET /gobbler/<command>/` | description of that specific command |
 
 ---
@@ -353,6 +355,100 @@ Ingests an array of typed items into the running pipeline. This is the primary f
   - `{"typeName": "...", "errors": [...]}` — field conversion errors.
   - `{"typeName": "...", "error": "type not registered"}` — type name unknown to the routing table.
   - `{"typeName": "...", "error": "worker queue full"}` — writer's queue is at capacity; item dropped.
+
+---
+
+## query group
+
+### `GET /gobbler/query/tables`
+
+Returns the list of types that are currently queryable — all types whose data exists in storage, regardless of whether they are registered in the active definition list.
+
+This endpoint is useful for exploring what has already been stored in `outputDir` (file mode) or in the storage account (blob mode), including types written by previous deployments or sessions. It reflects the catalog built from disk/blob, not the in-memory definition registry.
+
+The response returns only the table/types names, not their schema. For items in the definition list the schema can be found using `/gobbler/definition/list`. For types pre-existing in the `outputDir` the item structure can be obtained with simple query: { "query": "<table_name>(*) | take 3" }. 
+
+**Input:** none
+
+**200 response** — JSON array of table entries, one per queryable type:
+
+```json
+[
+  { "typeName": "alpha", "storageBucket": "alpha-folder", "mode": "file" },
+  { "typeName": "beta",  "storageBucket": "beta",         "mode": "file" }
+]
+```
+
+| Field | Description |
+|---|---|
+| `typeName` | The type/table name as it appears in GQL queries |
+| `storageBucket` | The subdirectory (file mode) or container name (blob mode) where the type's data lives |
+| `mode` | `"file"` or `"blob"` |
+
+Returns `[]` if no queryable types are found in storage.
+
+**Responses:**
+
+| Status | Body | Condition |
+|---|---|---|
+| 200 | `[{...}, ...]` | Catalog read successfully |
+| 409 | `{"error": "pipeline not configured; call pipeline/configure first"}` | `pipeline/configure` has not been called |
+| 500 | `{"error": "..."}` | Storage scan failed |
+
+---
+
+### `POST /gobbler/query`
+
+Executes a GQL query against the data stored by this Gobbler instance and returns the result as a JSON array of row objects.
+
+The pipeline does **not** need to be running — historical data is queryable as long as the pipeline has been configured (so that the storage location is known). The query engine reads directly from the stored CSV files or Azure Blob containers; it does not touch the live ingestion pipeline.
+
+**Input:**
+
+```json
+{ "query": "requests(*) | where statusCode >= 400 | project ingest_time, requestId, statusCode | take 3" }
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `query` | yes | GQL query string |
+
+**200 response** — JSON array of row objects, one object per result row. Column names are the keys. Null values are represented as JSON `null`:
+
+```json
+[
+  { "ingest_time": "2026-05-01 00:15:33.421", "requestId": "req-0000047", "statusCode": 400 },
+  { "ingest_time": "2026-05-01 00:23:11.882", "requestId": "req-0000063", "statusCode": 401 },
+  { "ingest_time": "2026-05-01 00:31:57.004", "requestId": "req-0000089", "statusCode": 500 }
+]
+```
+
+Returns `[]` when the query matches no rows.
+
+**Example with a null value** (optional `region` column not set for some rows):
+
+```json
+[
+  { "ingest_time": "2026-05-01 00:15:33.421", "requestId": "req-0000047", "region": "eastus" },
+  { "ingest_time": "2026-05-01 00:23:11.882", "requestId": "req-0000063", "region": null }
+]
+```
+
+**Responses:**
+
+| Status | Body | Condition |
+|---|---|---|
+| 200 | `[{"col": val, ...}, ...]` | Query executed successfully |
+| 400 | `{"error": "missing or empty 'query' parameter"}` | `query` parameter absent or empty string |
+| 400 | `{"error": "..."}` | GQL parse or validation error |
+| 409 | `{"error": "pipeline not configured; call pipeline/configure first"}` | `pipeline/configure` has not been called |
+| 500 | `{"error": "..."}` | Query execution error (I/O failure, type mismatch, etc.) |
+
+**Notes:**
+
+- The catalog of queryable types is built from the storage location specified in the last `pipeline/configure` call. In file mode, each subdirectory of `outputDir` that contains a `{typeName}.json` schema file is a queryable table. In blob mode, each Azure container that holds a valid gobbler schema blob is a queryable table.
+- Types that were removed from the active definition list via `definition/remove` remain queryable as long as their storage directory / container and schema file still exist on disk or in blob storage.
+- For GQL query syntax see `gobbler-query` documentation.
 
 ---
 
