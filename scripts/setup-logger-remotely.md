@@ -10,7 +10,7 @@ PS /media/wojtek/SamsungSSD/src/go> cd gobbler
 PS /media/wojtek/SamsungSSD/src/go> ./gobbler -port 8081
 ```
 
-## Rune the configuration script from another SSH terminal, but this one must run PowerShell
+## Run the configuration script from another SSH terminal, but this one must run PowerShell
 
 !! the PowerShell script by default assumes the logger runs @ localhost:8081. So if you start 
 the logger at a different port XXXX, you need to provide it as `-LoggerUrl http://localhost:XXXX`

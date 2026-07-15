@@ -2,6 +2,7 @@ package writers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -45,6 +46,51 @@ type FileWriter struct {
 	logger          gobblerclient.Client // always non-nil; Nop() when not configured
 }
 
+// checkSchemaConsistency returns an error if an existing {typeName}.json at
+// jsonFilePath is inconsistent with def. Returns nil when the file does not exist
+// (first run) or when the stored schema exactly matches the definition.
+func checkSchemaConsistency(jsonFilePath string, def items.ItemDefinition) error {
+	data, err := os.ReadFile(jsonFilePath)
+	if os.IsNotExist(err) {
+		return nil // no file yet — first time for this type
+	}
+	if err != nil {
+		return fmt.Errorf("read existing %s: %w", filepath.Base(jsonFilePath), err)
+	}
+
+	var existing struct {
+		OrderedColumns []struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+		} `json:"orderedColumns"`
+	}
+	if err := json.Unmarshal(data, &existing); err != nil {
+		return fmt.Errorf("parse existing %s: %w", filepath.Base(jsonFilePath), err)
+	}
+
+	// The stored file always has ingest_time as column 0 (prepended by StoredItemDefinition).
+	// Strip it before comparing against the user-defined columns in def.
+	cols := existing.OrderedColumns
+	if len(cols) > 0 && cols[0].Name == "ingest_time" {
+		cols = cols[1:]
+	}
+
+	if len(cols) != len(def.Columns) {
+		return fmt.Errorf("column count mismatch: stored schema has %d user columns, definition has %d",
+			len(cols), len(def.Columns))
+	}
+	for i, defCol := range def.Columns {
+		storedName := cols[i].Name
+		storedType := cols[i].Type
+		wantType := items.ColumnTypesMap[defCol.ValueType]
+		if storedName != defCol.Name || storedType != wantType {
+			return fmt.Errorf("column[%d] mismatch: stored {%q %q}, definition {%q %q}",
+				i+1, storedName, storedType, defCol.Name, wantType)
+		}
+	}
+	return nil
+}
+
 // NewFileWriter creates a FileWriter for the given definition rooted at rootDir.
 // writerBatchSize controls how many CSV lines trigger an immediate flush.
 // The subdirectory rootDir/def.Folder is created if it does not exist.
@@ -54,11 +100,17 @@ func NewFileWriter(rootDir string, def items.ItemDefinition, writerBatchSize int
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return nil, fmt.Errorf("writers: create directory %s: %w", outputDir, err)
 	}
+
+	jsonFilePath := filepath.Join(outputDir, def.TypeName+".json")
+	if err := checkSchemaConsistency(jsonFilePath, def); err != nil {
+		return nil, fmt.Errorf("writers: schema conflict for type %q in %s: %w", def.TypeName, outputDir, err)
+	}
+
 	schema, err := items.StoredItemDefinition(def)
 	if err != nil {
 		return nil, fmt.Errorf("writers: build %s.json for %s: %w", def.TypeName, def.TypeName, err)
 	}
-	if err := os.WriteFile(filepath.Join(outputDir, def.TypeName+".json"), schema, 0644); err != nil {
+	if err := os.WriteFile(jsonFilePath, schema, 0644); err != nil {
 		return nil, fmt.Errorf("writers: write %s.json for %s: %w", def.TypeName, def.TypeName, err)
 	}
 	maxAge := time.Duration(def.Latency) * time.Minute

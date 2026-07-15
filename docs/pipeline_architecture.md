@@ -1,4 +1,4 @@
-**Ingestion Pipeline Architecture**
+# Ingestion Pipeline Architecture
 
 This document summarizes Gobbler's ingestion pipeline with per‑type workers, queues, batching, and file/blob rotation.
 

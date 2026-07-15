@@ -59,17 +59,24 @@ Gobbler accepts arrays of JSON objects representing defined items types and
 - appends the buffers to timestamped files/blobs named after item type names, and 
 - rotates the files/blobs on the time interval set in item (`latencyMinutes` property above).
 
-Files/blobs with items of the same type are stored in one directory/container, named after item type name or by the `folder` definition property. File/blob names have the following structure `YYYY-MM-DD_HH-MM-SS.mmm_<typeName>.csv`, where the file timestamp preceding the type name is equal to the ingestion time property (`ingest_time`) of the first item stored in this file/blob. `ingest_time` property is added to every ingested item by Gobbler, and it is the time when the item was successfully converted to its CSV format. 
+Files/blobs with items of the same type are stored in one directory (file mode) or container (blob mode). The directory/container name is either
+- item type name, or 
+- item definition property `folder`. 
 
-This convention makes it convenient for processing the CSV files with analytical DB systems like Kusto (aka Azure Analytics) or DockDB.
+The `folder` property is used to put multiple items types in one directory (multiple item definitions have the same value of the property). `folder` property is optional, and if not provided the items name is used to name the directory/container. 
+
+Item-type-specific file/blob names have the following structure `YYYY-MM-DD_HH-MM-SS.mmm_<typeName>.csv`, where the file timestamp preceding the type name is equal to the ingestion time property (`ingest_time`) of the first item stored in this file/blob. `ingest_time` property is added to every ingested item by Gobbler, and it is the time when the item was successfully converted to its CSV format. 
+
+This convention makes it convenient for processing the CSV files with analytical DB systems like Kusto (aka Azure Analytics) or DockDB. Also, the GQL (Gobbler QUery Language) uses the convention to process only files that contain items in the requested time period. 
 
 ## Gobbler Architecture
 
-Gobble architecture has four distinct parts
+Gobble architecture has five distinct parts
 - the item definition part (`items` module)
 - the ingestion pipeline (`pipeline` module) 
 - the writers (`writers` module), and 
-- the REST interface (`server` module)
+- the REST interface (`server` module), and
+- the gobbler-query integration (including query REST endpoints). 
 
 ### Item definitions
 
@@ -128,13 +135,13 @@ In addition to the user-defined fields Gobbler adds, as the first field, a time 
 
 While a log file/blog is opened for receiving new items it should not be used for analysis, like opening it in a spreadsheet or uploading it to Kusto. The property `latencyMinutes` of item definition declares after what time, since creation of the current file/blob, Gobbler should rotate it (close the current one and open a new one with a new time stamp). Gobbler provides a function to force rotation of a current file/blob if it is needed for analysis sooner than its latency would imply.
 
-### Item type definition file (`{typeName}.json`)
+**Item type definition file (`{typeName}.json`)**
 
 When Gobbler creates a directory or Azure container for an item type — either at pipeline start or when a definition is hot-added to a running pipeline — it writes a file named `{typeName}.json` (e.g. `vm-shutdown.json`) to that directory/container. The file describes the record structure of the CSV data stored alongside it, so that query tools can parse the files without needing access to the Gobbler instance that produced them.
 
 The file contains a single JSON object with two fields:
 - `name` — the item type name (the same as the second part of the file/blob name)
-- `orderedColumns` — the complete, ordered list of columns as they appear in every CSV record
+- `orderedColumns` — an array containing ordered list of columns as they appear in every CSV record
 
 The `ingest_time` column (added by Gobbler at ingest time) is always listed first. Example for the test `vm-shutdown` item:
 
@@ -150,7 +157,7 @@ The `ingest_time` column (added by Gobbler at ingest time) is always listed firs
 }
 ```
 
-If the pipeline is stopped, the definition removed, and a new definition with a different schema added under the same name, the existing directory/container for the type should be renamed or deleted — otherwise `{typeName}.json` will be overwritten in the existing directory with the new schema, while the older CSV files still contain items with the old definition.
+If the pipeline is stopped, the definition removed, and a new definition with a different schema added under the same name, the existing directory/container for the type should be renamed or deleted. If that is not done, Gobbler will attempt to reuse the existing directory, will compare the `{typeName}.json` in that director with item definition, and will generate an error. If the definitions are teh same, Gobbler overwrite existing `{typeName}.json` file with identical file created from item definition.
 
 ### The ingestion pipeline
 
@@ -162,18 +169,18 @@ The architecture of the Gobbler's pipeline is described in more details in `docs
 
 **Conversion to CSV**
   - Produces a compact, normalized representation of items as CSV strings, with fields in the order defined by the item type
-  - The CSV string is wrapped in a `CSVitem` struct and sent directly to the appropriate per‑type worker queue
+  - The CSV string is wrapped in a `CSVitem` struct and sent directly to the appropriate per‑type worker queue (see below)
   - If the worker queue is full the item is rejected immediately and reported back to the caller — no silent drops
 
-**Per‑Type Worker-Writer**
+### Per‑Type Worker-Writer
+
 - Each item type has worker with a queue handling items of that type. A worker is composed of a batcher followed by a writer.
   - Batcher accumulated CSV strings in a buffer
-  - When the buffer reaches its defined size, it is passed to the Writer
+  - When the buffer reaches the configured size, it is passed to the Writer
   - Writer appended the CSV items to a file/blob in the corresponding directory/container
   - When a file/blob reaches a configured size or time limit, the writer rotates it
-- This is the end of the ingestion pipeline.
 
-## The REST Interface
+### The REST Interface
 
 Gobbler exposes the following REST endpoints under the `/gobbler` prefix (default port 8080):  
 
@@ -198,6 +205,14 @@ Gobbler exposes the following REST endpoints under the `/gobbler` prefix (defaul
 - `POST /gobbler/query` — execute a GQL query against stored data (body: `{"query": "<gql>"}`); returns a JSON array of row objects
 
 More detailed description of the REST interfaces is provides in `docs\REST-commands.md` document.
+
+### Gobbler query integration
+
+[kozwoj/gobbler-query](https://github.com/kozwoj/gobbler-query) is a stand-alone GQL (Gobbler QUery Language) query engine that can be used to query log files/blobs created by gobbler (this module). Gobbler itself, however, has been integrated with `gobbler-query` module so it can be also used to query stored log files. The different is the following 
+- `gobbler` itself can only query log files, or blobs, that it has access to via the configuration - `outputDir` for file mode and Azure storage account for blob mode. 
+- `gobbler-query` can query any file directories and blob containers that have been added to its table catalog by the user. It can therefore merge blobs with files, which gobbler cannot do, as it works in one mode only. 
+
+Gobbler query integration is described in `docs\query-integration.md`. In particular the note describes how `gobbler` creates table catalog by itself based on storage inspection and item definitions.   
 
 ## Gobbler Logging
 
@@ -321,7 +336,7 @@ The runner requires the pipeline to be already **configured but not yet running*
 Once the pipeline has been configured (it does not need to be running), you can query any data stored by this Gobbler instance using GQL.
 
 ```bash
-# List queryable types (includes historical types from previous runs)
+# List queryable types (includes types stored in previous runs)
 curl http://localhost:8080/gobbler/query/tables
 
 # Execute a GQL query — returns a JSON array of row objects
