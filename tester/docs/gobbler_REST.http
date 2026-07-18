@@ -12,6 +12,7 @@ POST http://localhost:8080/gobbler/pipeline/configure
 Content-Type: application/json
 
 {
+  "instanceName":    "gobbler-dev",
   "mode":            "file",
   "outputDir":       "C:\\temp\\gobbler-output",
   "accountName":     "",
@@ -215,5 +216,75 @@ Content-Type: application/json
 ]
 
 ###
+
+
+# **************************** Linux Docker smoke test ****************************
+# Prerequisites on the Linux host:
+#   docker load -i gobbler.tar
+#   mkdir -p /tmp/gobbler-output
+#   docker run -d --name gobbler-test -p 8080:8080 \
+#     -v /tmp/gobbler-output:/tmp/gobbler-output \
+#     gobbler:latest
+# Replace @linuxHost with the actual IP or hostname of the Linux machine.
+
+@linuxHost = localhost
+
+# 1. Configure the pipeline
+###
+POST http://{{linuxHost}}:8080/gobbler/pipeline/configure
+Content-Type: application/json
+
+{
+  "instanceName":    "gobbler-test",
+  "mode":            "file",
+  "outputDir":       "/tmp/gobbler-output",
+  "accountName":     "",
+  "accountKey":      "",
+  "writerQueueSize": 100,
+  "writerBatchSize": 10
+}
+
+# 2. Check status (should be "configured", not yet started)
+###
+GET http://{{linuxHost}}:8080/gobbler/pipeline/status
+
+# 3. Add a type definition
+###
+POST http://{{linuxHost}}:8080/gobbler/definition/add
+Content-Type: application/json
+
+{
+  "name": "vm-reboot",
+  "documentation": "virtual machine reboot event",
+  "folder": "administration",
+  "latencyMinutes": 10,
+  "orderedColumns": [
+    {"name": "vmId",          "type": "string"},
+    {"name": "eventTime",     "type": "datetime"},
+    {"name": "rebootReason",  "type": "string", "defaultValue": "unknown", "optional": false}
+  ]
+}
+
+# 4. Start the pipeline
+###
+POST http://{{linuxHost}}:8080/gobbler/pipeline/start
+
+# 5. Ingest some data
+###
+POST http://{{linuxHost}}:8080/gobbler/ingest
+Content-Type: application/json
+
+[
+  { "vm-reboot": { "vmId": "vm-001", "eventTime": "2024-01-15 10:00:00.000", "rebootReason": "OS update" } },
+  { "vm-reboot": { "vmId": "vm-002", "eventTime": "2024-01-15 10:01:00.000", "rebootReason": "Hardware fault" } }
+]
+
+# 6. Verify status
+###
+GET http://{{linuxHost}}:8080/gobbler/pipeline/status
+
+# 7. Stop the pipeline (triggers final flush — check /tmp/gobbler-output on the host)
+###
+POST http://{{linuxHost}}:8080/gobbler/pipeline/stop
 
 
