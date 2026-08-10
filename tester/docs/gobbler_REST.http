@@ -240,6 +240,14 @@ Content-Type: application/json
   "query": "requests (*) | where statusCode >= 400 | count"
 }
 
+###
+POST http://localhost:8080/gobbler/query
+Content-Type: application/json
+
+{
+  "query": "vm-shutdown (*) | take 2"
+}
+
 # **************************** Linux Docker smoke test ****************************
 # Prerequisites on the Linux host:
 #   docker load -i gobbler.tar
