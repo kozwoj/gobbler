@@ -456,6 +456,7 @@ func TestG2_ConfigureWhenRunning(t *testing.T) {
 	cfgBytes, _ := json.Marshal(map[string]interface{}{
 		"mode":            "file",
 		"outputDir":       t.TempDir(),
+		"instanceName":    "test-instance",
 		"workerQueueSize": 10,
 		"batchSize":       50,
 	})
@@ -530,6 +531,7 @@ func TestG6_StopReconfigureRestart(t *testing.T) {
 	cfg2, _ := json.Marshal(map[string]interface{}{
 		"mode":            "file",
 		"outputDir":       dir2,
+		"instanceName":    "test-instance",
 		"workerQueueSize": 10,
 		"batchSize":       50,
 	})

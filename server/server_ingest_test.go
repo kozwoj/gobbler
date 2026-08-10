@@ -272,6 +272,7 @@ func TestH4_BatchSizeImmediate(t *testing.T) {
 	cfgBytes, _ := json.Marshal(map[string]interface{}{
 		"mode":            "file",
 		"outputDir":       outputDir,
+		"instanceName":    "test-instance",
 		"writerQueueSize": 100,
 		"writerBatchSize": writerBatchSize,
 	})

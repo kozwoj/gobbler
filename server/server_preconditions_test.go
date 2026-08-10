@@ -190,7 +190,7 @@ func TestB4_ConfigureFileModeValid(t *testing.T) {
 	router := newTestRouter(s)
 
 	w := do(t, router, http.MethodPost, "/gobbler/pipeline/configure",
-		`{"mode": "file", "outputDir": "/tmp/gobbler", "writerQueueSize": 10, "writerBatchSize": 5}`)
+		`{"mode": "file", "outputDir": "/tmp/gobbler", "instanceName": "test-instance", "writerQueueSize": 10, "writerBatchSize": 5}`)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -207,7 +207,7 @@ func TestB5_StatusAfterConfigure(t *testing.T) {
 	router := newTestRouter(s)
 
 	do(t, router, http.MethodPost, "/gobbler/pipeline/configure",
-		`{"mode": "file", "outputDir": "/tmp/gobbler", "writerQueueSize": 10, "writerBatchSize": 5}`)
+		`{"mode": "file", "outputDir": "/tmp/gobbler", "instanceName": "test-instance", "writerQueueSize": 10, "writerBatchSize": 5}`)
 
 	w := do(t, router, http.MethodGet, "/gobbler/pipeline/status", "")
 
@@ -224,6 +224,15 @@ func TestB5_StatusAfterConfigure(t *testing.T) {
 	}
 	if body["mode"] != "file" {
 		t.Errorf("expected mode=file, got %v", body["mode"])
+	}
+	if body["instanceName"] != "test-instance" {
+		t.Errorf("expected instanceName=test-instance, got %v", body["instanceName"])
+	}
+	if body["outputDir"] != "/tmp/gobbler" {
+		t.Errorf("expected outputDir=/tmp/gobbler, got %v", body["outputDir"])
+	}
+	if body["accountName"] != "" {
+		t.Errorf("expected accountName empty, got %v", body["accountName"])
 	}
 	if body["writerQueueSize"] != float64(10) {
 		t.Errorf("expected writerQueueSize=10, got %v", body["writerQueueSize"])

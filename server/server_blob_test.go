@@ -88,6 +88,7 @@ func configureBlobModeWithBatch(t *testing.T, router http.Handler, sec blobSecre
 		"mode":            "blob",
 		"accountName":     sec.AccountName,
 		"accountKey":      sec.AccountKey,
+		"instanceName":    "test-instance",
 		"writerQueueSize": 200,
 		"writerBatchSize": writerBatchSize,
 	})

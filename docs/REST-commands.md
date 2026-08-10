@@ -242,6 +242,9 @@ Returns the current status and statistics of the pipeline.
   "running": false,
   "registeredDefinitions": 2,
   "mode": "file",
+  "instanceName": "my-gobbler-01",
+  "outputDir": "/gobbler/my-gobbler-01",
+  "accountName": "",
   "writerQueueSize": 100,
   "writerBatchSize": 50,
   "logger": { "configured": false }
@@ -256,6 +259,9 @@ Returns the current status and statistics of the pipeline.
   "running": false,
   "registeredDefinitions": 2,
   "mode": "file",
+  "instanceName": "my-gobbler-01",
+  "outputDir": "/gobbler/my-gobbler-01",
+  "accountName": "",
   "writerQueueSize": 100,
   "writerBatchSize": 50,
   "logger": { "configured": true }
@@ -270,6 +276,9 @@ Returns the current status and statistics of the pipeline.
   "running": true,
   "registeredDefinitions": 2,
   "mode": "file",
+  "instanceName": "my-gobbler-01",
+  "outputDir": "/gobbler/my-gobbler-01",
+  "accountName": "",
   "writerQueueSize": 100,
   "writerBatchSize": 50,
   "logger": { "configured": true, "running": true },
@@ -298,6 +307,9 @@ Returns the current status and statistics of the pipeline.
   "running": true,
   "registeredDefinitions": 2,
   "mode": "file",
+  "instanceName": "my-gobbler-01",
+  "outputDir": "/gobbler/my-gobbler-01",
+  "accountName": "",
   "writerQueueSize": 100,
   "writerBatchSize": 50,
   "logger": { "configured": true, "running": false, "error": "gobblerclient: server not running at http://logger:8080" },
@@ -306,7 +318,7 @@ Returns the current status and statistics of the pipeline.
 ```
 
 Always present fields: `configured` (bool), `running` (bool), `registeredDefinitions` (int).
-Present when configured: `mode`, `writerQueueSize`, `writerBatchSize`, `logger` object.
+Present when configured: `mode`, `instanceName`, `outputDir`, `accountName`, `writerQueueSize`, `writerBatchSize`, `logger` object. `outputDir` is empty when `mode` is `"blob"`; `accountName` is empty when `mode` is `"file"`.
 `logger` fields: `configured` (bool — whether `loggerEndpoint` was set in the last configure call); `running` (bool — present when pipeline is running, true if the client started successfully); `error` (string — present when pipeline is running and logger failed to start, persists until `pipeline/stop`).
 Present when running: `writers` map keyed by type name, each with `itemsInBuffer`, `itemsWritten`, `lastFlush`, `currentOutput`.
 
@@ -449,6 +461,41 @@ Returns `[]` when the query matches no rows.
 - The catalog of queryable types is built from the storage location specified in the last `pipeline/configure` call. In file mode, each subdirectory of `outputDir` that contains a `{typeName}.json` schema file is a queryable table. In blob mode, each Azure container that holds a valid gobbler schema blob is a queryable table.
 - Types that were removed from the active definition list via `definition/remove` remain queryable as long as their storage directory / container and schema file still exist on disk or in blob storage.
 - For GQL query syntax see `gobbler-query` documentation.
+
+---
+
+### `POST /gobbler/query/parse`
+
+Validates a GQL query string without executing it. Use this to check query syntax before submitting a full query.
+
+Requires `pipeline/configure` to have been called (so that the storage location is known). The pipeline does not need to be running.
+
+**Input:**
+
+```json
+{ "query": "requests(*) | where statusCode >= 400 | take 3" }
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `query` | yes | GQL query string to validate |
+
+**Responses:**
+
+| Status | Body | Condition |
+|---|---|---|
+| 200 | `{"status": "ok"}` | Query is syntactically valid |
+| 400 | `{"error": "...", "line": N, "column": N}` | Parse error — position is 1-based line and column |
+| 400 | `{"error": "missing or empty 'query' field"}` | `query` field absent or empty string |
+| 409 | `{"error": "pipeline not configured; call pipeline/configure first"}` | `pipeline/configure` has not been called |
+
+**Example parse error response:**
+
+```json
+{ "error": "expected identifier", "line": 1, "column": 22 }
+```
+
+**Note:** This endpoint validates syntax only (parse phase). Semantic errors such as references to unknown table names or undefined columns are not caught here — they will surface when the query is executed via `POST /gobbler/query`.
 
 ---
 

@@ -259,7 +259,10 @@ func (s *Server) handlePipelineStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.config != nil {
-		status["mode"] = string(s.config.Mode)
+		status["mode"]            = string(s.config.Mode)
+		status["instanceName"]    = s.config.InstanceName
+		status["outputDir"]       = s.config.OutputDir
+		status["accountName"]     = s.config.AccountName
 		status["writerQueueSize"] = s.config.WriterQueueSize
 		status["writerBatchSize"] = s.config.WriterBatchSize
 
