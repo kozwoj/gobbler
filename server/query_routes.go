@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	gqlapi "github.com/kozwoj/gobbler-query/api"
 	gqlcatalog "github.com/kozwoj/gobbler-query/query/catalog"
+	gqlparser "github.com/kozwoj/gobbler-query/query/parser"
 	"github.com/kozwoj/gobbler/items"
 	"github.com/kozwoj/gobbler/pipeline"
 	gobblerquery "github.com/kozwoj/gobbler/query"
@@ -23,6 +24,9 @@ func (s *Server) queryRoutes(r chi.Router) {
 
 	r.Get("/tables", s.handleQueryTables)
 	r.Get("/tables/", s.handleQueryTablesHelp)
+
+	r.Post("/parse", s.handleQueryParse)
+	r.Get("/parse/", s.handleQueryParseHelp)
 }
 
 func (s *Server) handleQueryDiscovery(w http.ResponseWriter, r *http.Request) {
@@ -199,4 +203,57 @@ func isQueryClientError(err error) bool {
 	return strings.HasPrefix(msg, "parse:") ||
 		strings.HasPrefix(msg, "plan:") ||
 		strings.HasPrefix(msg, "validate:")
+}
+
+// handleQueryParse validates a GQL query string without executing it.
+// Returns 200 {"status":"ok"} on success, 400 with position info on a parse
+// error, or 409 if the pipeline has not been configured.
+func (s *Server) handleQueryParse(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Query string `json:"query"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.Query) == "" {
+		sendError(w, http.StatusBadRequest, "missing or empty 'query' field")
+		return
+	}
+
+	s.mu.RLock()
+	cfg := s.config
+	s.mu.RUnlock()
+
+	if cfg == nil {
+		sendError(w, http.StatusConflict, "pipeline not configured; call pipeline/configure first")
+		return
+	}
+
+	if _, err := gqlparser.Parse(req.Query); err != nil {
+		if pe, ok := err.(*gqlparser.ParseError); ok {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+				"error":  pe.Msg,
+				"line":   pe.Line,
+				"column": pe.Col,
+			})
+		} else {
+			sendError(w, http.StatusBadRequest, err.Error())
+		}
+		return
+	}
+
+	sendJSON(w, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleQueryParseHelp(w http.ResponseWriter, r *http.Request) {
+	sendJSON(w, map[string]interface{}{
+		"description": "Validates a GQL query string without executing it. Returns 200 {\"status\":\"ok\"} on success, or 400 with parse error position. Requires pipeline/configure.",
+		"method":      "POST",
+		"path":        "/gobbler/query/parse",
+		"input":       `{"query": "<gql query string>"}`,
+		"output":      `{"status": "ok"} or {"error": "...", "line": N, "column": N}`,
+	})
 }

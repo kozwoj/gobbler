@@ -28,6 +28,7 @@ GET http://localhost:8080/gobbler/pipeline/status
 ###
 GET http://localhost:8081/gobbler/pipeline/status
 
+# !! below call is to a remote host 
 ###
 GET http://192.168.254.32:8081/gobbler/pipeline/status
 
@@ -217,6 +218,27 @@ Content-Type: application/json
 
 ###
 
+# **************************** Query local host ****************************
+# the "C:\\temp\\gobbler-output" directory must be prepopulated with the test data 
+# from gobbler-query (requests and users) before running these queries.
+###
+GET http://localhost:8080/gobbler/query/tables
+
+### 
+POST http://localhost:8080/gobbler/query/parse
+Content-Type: application/json
+
+{
+  "query": "requests(*) | where statusCode >= 400 | project ingest_time, requestId, statusCode | take 3"
+}
+
+###
+POST http://localhost:8080/gobbler/query
+Content-Type: application/json
+
+{
+  "query": "requests (*) | where statusCode >= 400 | count"
+}
 
 # **************************** Linux Docker smoke test ****************************
 # Prerequisites on the Linux host:

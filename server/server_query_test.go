@@ -308,3 +308,79 @@ func TestQY11_Tables_ReturnsEntries(t *testing.T) {
 		t.Errorf("querytest not found in tables response: %v", entries)
 	}
 }
+
+// ── QY12–QY15: query/parse endpoint ──────────────────────────────────────────
+
+// postQueryParse sends POST /gobbler/query/parse with the given GQL string.
+func postQueryParse(t *testing.T, router http.Handler, gql string) *httptest.ResponseRecorder {
+	t.Helper()
+	body, _ := json.Marshal(map[string]string{"query": gql})
+	return do(t, router, http.MethodPost, "/gobbler/query/parse", string(body))
+}
+
+// configureParseTest creates a server, configures file mode, and returns the
+// router. The pipeline is NOT started — parse does not require it.
+func configureParseTest(t *testing.T) http.Handler {
+	t.Helper()
+	t.Cleanup(pipeline.Reset)
+	s := New()
+	router := newTestRouter(s)
+	configureFileMode(t, router, t.TempDir())
+	return router
+}
+
+// QY12: POST /gobbler/query/parse before configure → 409.
+func TestQY12_Parse_NotConfigured(t *testing.T) {
+	t.Cleanup(pipeline.Reset)
+	router := newTestRouter(New())
+	w := postQueryParse(t, router, "alpha(*)")
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// QY13: Missing / empty query field → 400.
+func TestQY13_Parse_EmptyQuery(t *testing.T) {
+	router := configureParseTest(t)
+	w := do(t, router, http.MethodPost, "/gobbler/query/parse", `{}`)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// QY14: Syntactically valid GQL → 200 {"status":"ok"}.
+// The pipeline does not need to be running and the table need not exist.
+func TestQY14_Parse_ValidQuery(t *testing.T) {
+	router := configureParseTest(t)
+	w := postQueryParse(t, router, "alpha(*)")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	body := decodeJSON(t, w)
+	if body["status"] != "ok" {
+		t.Errorf("expected status=ok, got %v", body["status"])
+	}
+}
+
+// QY15: Syntactically invalid GQL → 400 with error, line, and column fields.
+func TestQY15_Parse_InvalidQuery(t *testing.T) {
+	router := configureParseTest(t)
+	w := postQueryParse(t, router, "requests(* |")
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	body := decodeJSON(t, w)
+	if _, ok := body["error"]; !ok {
+		t.Error("expected 'error' field in response")
+	}
+	if _, ok := body["line"]; !ok {
+		t.Error("expected 'line' field in response")
+	}
+	if _, ok := body["column"]; !ok {
+		t.Error("expected 'column' field in response")
+	}
+	if body["line"] != float64(1) {
+		t.Errorf("expected line=1, got %v", body["line"])
+	}
+}
+
