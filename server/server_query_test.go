@@ -383,4 +383,3 @@ func TestQY15_Parse_InvalidQuery(t *testing.T) {
 		t.Errorf("expected line=1, got %v", body["line"])
 	}
 }
-

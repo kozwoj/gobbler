@@ -67,7 +67,7 @@ Content-Type: application/json
 		{"name": "eventTime", "type": "datetime"},
 		{"name": "rebootStart", "type": "datetime"},
 		{"name": "rebootDuration", "type": "timespan", "optional": true},
-        {"name": "rebootReason", "type": "string", "defaultValue": "unknown", "optional": false},
+    {"name": "rebootReason", "type": "string", "defaultValue": "unknown", "optional": false},
 		{"name": "OS", "type": "dynamic", "defaultValue": "{\"os\": \"Windows\", \"version\": \"11\"}", "optional": false}
 	]
 }

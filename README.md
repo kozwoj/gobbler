@@ -1,38 +1,25 @@
 # Gobbler Overview
 
-**Gobbler** is a configurable ingestion pipeline server <u>for strongly-typed telemetry data</u> written in Go. It is a component of the Gobbler telemetry suite that has three parts:
-
-```mermaid
-flowchart LR
-    classDef thick stroke-width:3px,stroke:#222;
-
-    B:::thick
-    C:::thick
-
-    A["Application\n(with gobbler-client)"]
-    B["Gobbler Server\n(ingest + query)"]
-    C[("Storage\n(CSV files or Azure Blobs)")]
-    D["gobbler-query CLI\n(standalone)"]
-    E["Query Client\n(portal / curl)"]
-
-    A -->|"POST /gobbler/ingest"| B
-    B -->|"timestamped CSV items"| C
-    B -->|reads| C
-    E -->|"POST /gobbler/query"| B
-    C -->|"gq query run '...'"| D
-```
+**Gobbler** It is the main component of the `Gobbler Telemetry Suite`, which was designed to be a minimalistic, self-contained, yet fully functional monitoring solution written in Go. The components of the suite are:
 
 | Component | Repository | Role |
 |---|---|---|
-| **gobbler-client** | [kozwoj/gobbler-client](https://github.com/kozwoj/gobbler-client) | Go SDK — used to instrument applications |
-| **gobbler** | *this repo* | Server — accepts, validates, buffers, and flushes telemetry items to storage; also exposes a GQL query endpoint (`POST /gobbler/query`) over stored data |
-| **gobbler-query** | [kozwoj/gobbler-query](https://github.com/kozwoj/gobbler-query) | GQL query engine — embedded in gobbler and available as a standalone CLI (`gq`) for querying existing data directories |
- 
+| **gobbler** | *this repo* | Gobbler pipeline server — accepts, validates, buffers, and flushes telemetry items to storage; also exposes a GQL query endpoint (`POST /gobbler/query`) over stored data |
+| **gobbler-query** | [kozwoj/gobbler-query](https://github.com/kozwoj/gobbler-query) | GQL query engine — embedded in gobbler and available as a standalone CLI (`gq`) for querying collected telemetry data |
+| **gobbler-client** | [kozwoj/gobbler-client](https://github.com/kozwoj/gobbler-client) | Go SDK — used to instrument applications to send telemetry to Gobbler | 
+| **gobbler-agent** | [kozwoj/gobbler-agent](https://github.com/kozwoj/gobbler-agent) | Linux host agent — manages containerized Gobbler instances running in Docker |
+| **gobbler-portal** | [kozwoj/gobbler-portal](https://github.com/kozwoj/gobbler-portal) | Admin controller — manages hosts, native/containerized instances, definitions, pipelines, and queries |
+| **gobbler-test** | [kozwoj/gobbler-test](https://github.com/kozwoj/gobbler-test) | Scenario simulator — generates realistic test telemetry against one or more running Gobbler instances |
 
-There are two aspects of Gobbler's configurability 
+**Gobbler** is a configurable ingestion pipeline server <u>for strongly-typed telemetry data</u> which takes dependency on **gobbler-query** to allow analyzing the collected data using GQL (Gobbler Query Language). 
+<img src="images/gobbler-suite_gobbler.jpg" width="700" alt="Photo">
+
+In its simplest (and minimal) form a monitoring solution can be a single instance of Gobbler running on a RaspberryPi. 
+
+There are two aspects of Gobbler's configurability: 
 1. Before staring the pipeline the user can set up server's operational parameters like target storage (files vs. Azure blobs), ingestion queue sizes, batch sizes, and operational logging. 
    
-2. Before starting the pipeline, but also when it is running, the user can add definitions of the structure of telemetry items to be ingested and stored by Gobbler. 
+2. Before starting the pipeline, but also when it is running, the user can add definitions of structured telemetry items to be ingested and stored by Gobbler. 
 
 Gobbler ingests and stores only telemetry items that have been defined and added to its item dictionary. Item definitions are JSON objects with the schema provided in `docs\JSON-schemas.md`. Below is an example of a VM shutdown event log item definition. 
 
@@ -65,16 +52,16 @@ Files/blobs with items of the same type are stored in one directory (file mode) 
 
 The `folder` property is used to put multiple items types in one directory (multiple item definitions have the same value of the property). `folder` property is optional, and if not provided the items name is used to name the directory/container. 
 
-Item-type-specific file/blob names have the following structure `YYYY-MM-DD_HH-MM-SS.mmm_<typeName>.csv`, where the file timestamp preceding the type name is equal to the ingestion time property (`ingest_time`) of the first item stored in this file/blob. `ingest_time` property is added to every ingested item by Gobbler, and it is the time when the item was successfully converted to its CSV format. 
+Item-type-specific file/blob names have the following structure `YYYY-MM-DD_HH-MM-SS.mmm_<typeName>.csv`, where the file timestamp preceding the type's name is equal to the ingestion time property (`ingest_time`) of the first item stored in this file/blob. `ingest_time` property is added to every ingested item by Gobbler, and it is the time when the item was successfully converted to its CSV format and enqueued (not when it was written to the file/blob). 
 
-This convention makes it convenient for processing the CSV files with analytical DB systems like Kusto (aka Azure Analytics) or DockDB. Also, the GQL (Gobbler QUery Language) uses the convention to process only files that contain items in the requested time period. 
+This convention makes it convenient for processing the CSV files with analytical DB systems like Kusto (aka Azure Analytics) or DockDB. Also, the GQL (a large subset of Kusto Query Language) uses that convention to process only files that contain items in the requested time period. 
 
 ## Gobbler Architecture
 
 Gobble architecture has five distinct parts
 - the item definition part (`items` module)
 - the ingestion pipeline (`pipeline` module) 
-- the writers (`writers` module), and 
+- the writers (`writers` module) 
 - the REST interface (`server` module), and
 - the gobbler-query integration (including query REST endpoints). 
 
@@ -157,7 +144,7 @@ The `ingest_time` column (added by Gobbler at ingest time) is always listed firs
 }
 ```
 
-If the pipeline is stopped, the definition removed, and a new definition with a different schema added under the same name, the existing directory/container for the type should be renamed or deleted. If that is not done, Gobbler will attempt to reuse the existing directory, will compare the `{typeName}.json` in that director with item definition, and will generate an error. If the definitions are teh same, Gobbler overwrite existing `{typeName}.json` file with identical file created from item definition.
+If the pipeline is stopped, the definition removed, and a new definition with a different schema added under the same name, the existing directory/container for the type should be renamed or deleted. If that is not done, Gobbler will attempt to reuse the existing directory, will compare the `{typeName}.json` in that director with item definition, and will generate an error. If the definitions are the same, Gobbler overwrite existing `{typeName}.json` file with identical file created from item definition.
 
 ### The ingestion pipeline
 
@@ -168,17 +155,17 @@ The architecture of the Gobbler's pipeline is described in more details in `docs
   - Valid objects/items are passed to the next stage
 
 **Conversion to CSV**
-  - Produces a compact, normalized representation of items as CSV strings, with fields in the order defined by the item type
+  - Produces a compact, normalized representation of items as CSV strings, with fields in the order defined in the item type
   - The CSV string is wrapped in a `CSVitem` struct and sent directly to the appropriate per‑type worker queue (see below)
-  - If the worker queue is full the item is rejected immediately and reported back to the caller — no silent drops
+  - If the worker queue is full, the item is rejected immediately and reported back to the caller — no silent drops
 
 ### Per‑Type Worker-Writer
 
 - Each item type has worker with a queue handling items of that type. A worker is composed of a batcher followed by a writer.
   - Batcher accumulated CSV strings in a buffer
   - When the buffer reaches the configured size, it is passed to the Writer
-  - Writer appended the CSV items to a file/blob in the corresponding directory/container
-  - When a file/blob reaches a configured size or time limit, the writer rotates it
+  - Writer appends the CSV items to a file/blob in the corresponding directory/container
+  - When a file/blob reaches the configured size or time limit, the writer rotates it
 
 ### The REST Interface
 
@@ -191,41 +178,41 @@ Gobbler exposes the following REST endpoints under the `/gobbler` prefix (defaul
 - `POST /gobbler/definition/remove` — remove a registered item type (body: `{"typeName": "..."}`)
 
 **Pipeline management**
-- `POST /gobbler/pipeline/configure` — set storage mode and pipeline parameters
+- `POST /gobbler/pipeline/configure` — set Gobbler instance name, storage mode, and pipeline parameters
 - `POST /gobbler/pipeline/start` — start the pipeline (requires at least one definition)
-- `POST /gobbler/pipeline/stop` — stop the pipeline and flush all writers
+- `POST /gobbler/pipeline/stop` — stop the pipeline and flush all writer queues
 - `POST /gobbler/pipeline/rotate` — force rotation of a type's current file/blob (body: `{"typeName": "..."}`)
-- `GET  /gobbler/pipeline/status` — return pipeline configuration and running state
+- `GET  /gobbler/pipeline/status` — return pipeline configuration and it's running state
 
 **Ingestion**
 - `POST /gobbler/ingest` — ingest an array of typed JSON items (body: `[{"typeName": {...fields}}, ...]`); returns 400 if the body is not a valid JSON array or contains no parseable items, 200 with `{"ingested": N, "rejected": [...]}` otherwise
 
 **Query** (pipeline must be configured; does not need to be running)
-- `GET  /gobbler/query/tables` — list types that are queryable in storage (includes historical types no longer in the active definition list)
+- `GET  /gobbler/query/tables` — list types that are queryable in the associated Azure account (blob mode) or output directory (file mode). The list of tables includes discovered types not in the active definitions list.
 - `POST /gobbler/query` — execute a GQL query against stored data (body: `{"query": "<gql>"}`); returns a JSON array of row objects
 
 More detailed description of the REST interfaces is provides in `docs\REST-commands.md` document.
 
 ### Gobbler query integration
 
-[kozwoj/gobbler-query](https://github.com/kozwoj/gobbler-query) is a stand-alone GQL (Gobbler QUery Language) query engine that can be used to query log files/blobs created by gobbler (this module). Gobbler itself, however, has been integrated with `gobbler-query` module so it can be also used to query stored log files. The different is the following 
+[kozwoj/gobbler-query](https://github.com/kozwoj/gobbler-query) is a stand-alone GQL (Gobbler Query Language) query engine that can be used to query log files/blobs created by Gobbler (this module). Gobbler itself, however, has been integrated with `gobbler-query` module so it can be also used to query stored log files. The different is the following 
 - `gobbler` itself can only query log files, or blobs, that it has access to via the configuration - `outputDir` for file mode and Azure storage account for blob mode. 
 - `gobbler-query` can query any file directories and blob containers that have been added to its table catalog by the user. It can therefore merge blobs with files, which gobbler cannot do, as it works in one mode only. 
 
-Gobbler query integration is described in `docs\query-integration.md`. In particular the note describes how `gobbler` creates table catalog by itself based on storage inspection and item definitions.   
+Gobbler query integration is described in `docs\query-integration.md`. In particular the note describes how Gobbler creates table catalog by itself based on storage inspection and item definitions.   
 
 ## Gobbler Logging
 
-Gobbler can log its own operational events, using Gobbler Client SDK, to a second Gobbler instance (the "logger Gobbler"), enabling structured, queryable telemetry about ingestion performance and writer behaviour. This self-logging feature is configured via the `POST /gobbler/pipeline/configure` endpoint using the following fields:
+Gobbler can log its own operational events, using **gobbler-client** SDK, to a second Gobbler instance (the "logger Gobbler"), enabling structured, queryable telemetry about ingestion performance and writer behavior. This self-logging feature is configured via the `POST /gobbler/pipeline/configure` endpoint using the following configuration fields:
 
 | Field | Type | Description |
 |---|---|---|
-| `loggerEndpoint` | string | URL of the receiving Gobbler instance, e.g. `http://host:8081` |
+| `loggerEndpoint` | string | URL of the logger Gobbler instance, e.g. `http://<IP address>:8081` |
 | `loggerTypes` | array of strings | Item type names the instrumented instance will emit |
 | `loggerBatchSize` | int | Client batch size; 0 uses the default (100) |
-| `loggerFlushInterval` | string | Go duration string, e.g. `"30s"`; `""` uses the default (10s) |
+| `loggerFlushInterval` | string | Go duration string, e.g. `"30s"`; `""` uses the default 10s |
 
-When `loggerEndpoint` is set, the server constructs an internal [`gobbler-client`](https://github.com/kozwoj/gobbler-client) that ships operational events to the logger instance. The client buffers items in memory and flushes them in batches; if the logger is unreachable it returns `ErrBufferFullServerDown` so the instrumented instance continues operating without blocking. Four event types are defined:
+When `loggerEndpoint` is set, the server constructs an internal [`gobbler-client`](https://github.com/kozwoj/gobbler-client) that sends operational events to the logger instance. The client buffers items in memory and flushes them in batches; if the logger is unreachable it returns `ErrBufferFullServerDown` so the instrumented instance continues operating without blocking. Four event types are defined:
 
 | Type name | Folder | Description |
 |---|---|---|
@@ -249,6 +236,8 @@ The logger Gobbler instance must be started and configured independently before 
 ```
 
 The script accepts optional parameters `-LoggerUrl` (default `http://localhost:8081`), `-BatchSize` (default 50), and `-QueueSize` (default 100). Remote setup is described in `scripts\setup-logger-remotely.md`.
+
+Gobbler instance logging can be turned on and off by changing the configuration. For example an instance can be started without logging. Then the logger Gobbler can be instantiated. And then, the Gobbler instance in question can be reconfigured by adding the logging configuration fields. Every re-configuration will stop and restart the pipeline. 
 
 ## Quick Start
 
