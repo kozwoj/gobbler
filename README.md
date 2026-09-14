@@ -11,7 +11,7 @@
 | **gobbler-portal** | [kozwoj/gobbler-portal](https://github.com/kozwoj/gobbler-portal) | Admin controller — manages hosts, native/containerized instances, definitions, pipelines, and queries |
 | **gobbler-test** | [kozwoj/gobbler-test](https://github.com/kozwoj/gobbler-test) | Scenario simulator — generates realistic test telemetry against one or more running Gobbler instances |
 
-**Gobbler** is a configurable ingestion pipeline server <u>for strongly-typed telemetry data</u> which takes dependency on **gobbler-query** to allow analyzing the collected data using GQL (Gobbler Query Language). 
+**Gobbler** is a configurable ingestion pipeline server <u>for strongly-typed telemetry data</u> which takes dependency on **gobbler-query** to allow analyzing the collected data using GQL (Gobbler Query Language). It has been designed to be simple, deterministic and predictable single binary with no "hidden magic" or external dependencies. In its simplest (and minimal) form Gobbler monitoring solution can easily run on a RaspberryPi.   
 <img src="images/gobbler-suite_gobbler.jpg" width="700" alt="Photo">
 
 In its simplest (and minimal) form a monitoring solution can be a single instance of Gobbler running on a RaspberryPi. 
@@ -250,6 +250,8 @@ This section walks through building Gobbler, starting it, configuring the pipeli
 go build -o gobbler.exe .        # Windows
 go build -o gobbler      .       # Linux / macOS
 ```
+
+**Note**: for building a small size production version use: ```go build -trimpath -ldflags="-s -w" -o gobbler.exe .``` or ```go build -trimpath -ldflags="-s -w" -o gobbler .```, depending on the target operating system. Keep in mind that such version does not include debugging information. 
 
 ### 2. Start the server
 
